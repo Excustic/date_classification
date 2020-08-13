@@ -1,0 +1,258 @@
+Index: smart_approach.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import pickle\r\nfrom os import path, listdir, mkdir\r\nfrom os.path import join, isdir\r\nimport sys\r\n\r\nfrom keras.callbacks import ModelCheckpoint\r\nfrom keras import applications, Model, Input\r\nfrom keras.losses import BinaryCrossentropy\r\nfrom keras.optimizers import SGD, Adam\r\nimport numpy as np\r\nfrom keras.preprocessing.image import ImageDataGenerator\r\nfrom keras.models import Sequential, load_model\r\nfrom keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D\r\nfrom keras.layers import Activation, Dropout, Flatten, Dense\r\nfrom keras import backend as K\r\nfrom sklearn.model_selection import train_test_split, cross_val_score\r\nfrom keras.preprocessing.image import load_img\r\nfrom keras.preprocessing.image import img_to_array\r\nimport matplotlib.pyplot as plt\r\nimport tensorflow as tf\r\n\r\nlabels = []\r\nfeatures = []\r\ntrain_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']\r\ntrain_path = 'origin'\r\nsave_path = 'saved_files'\r\nfixed_size = tuple((200, 200))\r\nhome = sys.path[0]\r\nepochs = 20\r\nsessions = 5\r\nmodel_name = 'CNN_model'\r\nhistory_name = 'CNN_history'\r\ntrain_data_dir = 'v_data/origin'\r\nvalidation_data_dir = 'v_data/test'\r\nnb_train_samples = 400\r\nnb_validation_samples = 100\r\nepochs = 10\r\nbatch_size = 32\r\n\r\n\r\ndef save_files():\r\n    datagen = ImageDataGenerator(\r\n        rotation_range=40,\r\n        width_shift_range=0.2,\r\n        height_shift_range=0.2,\r\n        rescale=1. / 255,\r\n        shear_range=0.2,\r\n        zoom_range=0.2,\r\n        horizontal_flip=True,\r\n        fill_mode='nearest')\r\n\r\n    # loop over the training data sub-folders\r\n    for training_name in train_labels:\r\n\r\n        photos = []\r\n\r\n        # join the training data path and each species training folder\r\n        dir = join(home, train_path, training_name)\r\n\r\n        # get the current training label\r\n        current_label = training_name.split('_')[1]\r\n\r\n        # loop over the images in each sub-folder\r\n        for filename in listdir(dir):\r\n            # avoid non jpg files\r\n            if filename.split('.')[1] != \"jpg\":\r\n                continue\r\n            # load image\r\n            photo = load_img(join(dir, filename), target_size=fixed_size)\r\n            # convert to numpy array\r\n            photo = img_to_array(photo) / 255.0\r\n            # store\r\n            photos.append(photo)\r\n        if not isdir(join(home, save_path, 'preview')):\r\n            mkdir(join(home, save_path, 'preview'))\r\n        photos = np.asarray(photos)\r\n        i = 0\r\n        for _ in datagen.flow(photos, batch_size=len(photos),\r\n                              save_to_dir=join(home, save_path, 'preview'),\r\n                              save_prefix=training_name, save_format='jpeg'):\r\n            i += 1\r\n            if i > 5:\r\n                break  # otherwise the generator would loop indefinitely\r\n\r\n\r\ndef import_data():\r\n\r\n    # this is the augmentation configuration we will use for training\r\n    train_datagen = ImageDataGenerator(\r\n        rescale=1. / 255,\r\n        shear_range=0.2,\r\n        zoom_range=0.2,\r\n        horizontal_flip=True,\r\n        validation_split=0.2)\r\n\r\n    # this is a generator that will read pictures found in\r\n    # subfolers of 'data/origin', and indefinitely generate\r\n    # batches of augmented image data\r\n    train_generator = train_datagen.flow_from_directory(\r\n        join(home, train_path),  # this is the target directory\r\n        target_size=fixed_size,  # all images will be resized to fixed_size\r\n        batch_size=batch_size,\r\n        class_mode='sparse',\r\n        subset='training')  # since we use categorical_crossentropy loss, we need categorical labels\r\n\r\n    # this is a similar generator, for validation data\r\n    validation_generator = train_datagen.flow_from_directory(\r\n        join(home, train_path),\r\n        target_size=fixed_size,\r\n        batch_size=batch_size,\r\n        class_mode='sparse',\r\n        subset='validation')\r\n\r\n    return train_generator, validation_generator\r\n\r\n\r\ndef build_model():\r\n    pass\r\n    # # what is the image data format convention\r\n    # if K.image_data_format() == \"channels_first\":\r\n    #     input_shape = (3, fixed_size[0], fixed_size[1])\r\n    # else:\r\n    #     input_shape = (fixed_size[0], fixed_size[1], 3)\r\n    # # Create base model\r\n    # base_model = keras.applications.Xception(\r\n    #     weights='imagenet',\r\n    #     input_shape=(150, 150, 3),\r\n    #     include_top=False)\r\n    # # Freeze base model\r\n    # base_model.trainable = False\r\n    #\r\n    # # Create new model on top.\r\n    # inputs = Input(shape=(150, 150, 3))\r\n    # x = base_model(inputs, training=False)\r\n    # x = GlobalAveragePooling2D()(x)\r\n    # outputs = Dense(1)(x)\r\n    # model = Model(inputs, outputs)\r\n    #\r\n    # loss_fn = BinaryCrossentropy(from_logits=True)\r\n    # optimizer = Adam()\r\n    #\r\n    # # # Iterate over the batches of a dataset.\r\n    # # for inputs, targets in new_dataset:\r\n    # #     # Open a GradientTape.\r\n    # #     with tf.GradientTape() as tape:\r\n    # #         # Forward pass.\r\n    # #         predictions = model(inputs)\r\n    # #         # Compute the loss value for this batch.\r\n    # #         loss_value = loss_fn(targets, predictions)\r\n    #\r\n    #     # # Get gradients of loss wrt the *trainable* weights.\r\n    #     # gradients = tape.gradient(loss_value, model.trainable_weights)\r\n    #     # # Update the weights of the model.\r\n    #     # optimizer.apply_gradients(zip(gradients, model.trainable_weights))\r\n    #\r\n    # return model\r\n\r\n\r\ndef train_model(train_generator, validation_generator):\r\n\r\n    model = build_model()\r\n    # checkpoint\r\n    filepath = \"weights_best.hdf5\"\r\n    checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')\r\n    callbacks_list = [checkpoint]\r\n\r\n    # origin [sessions] models each [epochs] times\r\n    max_acc = 0.0\r\n    for i in range(sessions):\r\n        # model training and evaluation\r\n        history = model.fit_generator(\r\n            train_generator,\r\n            steps_per_epoch=2000 // batch_size,\r\n            epochs=50,\r\n            validation_data=validation_generator,\r\n            validation_steps=800 // batch_size\r\n            , verbose=2, callbacks=callbacks_list)\r\n        test_loss, test_acc = model.evaluate_generator(validation_generator, 500)\r\n        # save model if it performed better\r\n        if test_acc > max_acc:\r\n            max_acc = test_acc\r\n            model.save(join(home, save_path, model_name))\r\n            with open(join(home, save_path, history_name), 'wb') as file:\r\n                pickle.dump(history.history, file)\r\n        print(\"accuracy: \", test_acc, \"\\n Loss:\", test_loss)\r\n\r\n\r\ndef plot_progress(history):\r\n    acc = history['accuracy']\r\n    val_acc = history['val_accuracy']\r\n\r\n    loss = history['loss']\r\n    val_loss = history['val_loss']\r\n\r\n    epochs_range = range(epochs)\r\n\r\n    plt.figure(figsize=(8, 8))\r\n    plt.subplot(1, 2, 1)\r\n    plt.plot(epochs_range, acc, label='Training Accuracy')\r\n    plt.plot(epochs_range, val_acc, label='Validation Accuracy')\r\n    plt.legend(loc='lower right')\r\n    plt.title('Training and Validation Accuracy')\r\n\r\n    plt.subplot(1, 2, 2)\r\n    plt.plot(epochs_range, loss, label='Training Loss')\r\n    plt.plot(epochs_range, val_loss, label='Validation Loss')\r\n    plt.legend(loc='upper right')\r\n    plt.title('Training and Validation Loss')\r\n    plt.show()\r\n\r\n\r\ndef predict(model, image):\r\n    p = model.predict(image)\r\n    print(p)\r\n\r\ntry:\r\n    saved_files = listdir(join(home, save_path))\r\n    files_exist = [True for f in train_labels if saved_files.count(f + '.npy')]\r\n    if files_exist.count(False) != 0 or len(files_exist) == 0:\r\n        save_files()\r\nexcept OSError as e:\r\n    mkdir(join(home, save_path))\r\n    save_files()\r\n\r\ntrain_generator, validation_generator = import_data()\r\n# train_model(train_generator, validation_generator)\r\n# model = load_model(join(home, save_path, model_name))\r\n# history = pickle.load(open(join(home, save_path, history_name), \"rb\"))\r\n# plot_progress(history)\r\nmodel = build_model()\r\nmodel.load_weights(\"weights_best.hdf5\")\r\nprint(model.evaluate_generator(validation_generator, 250))
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- smart_approach.py	(revision 1d7a560b66a1aa1325de5c16bf181b7b5ade1bcf)
++++ smart_approach.py	(date 1597316155903)
+@@ -3,9 +3,11 @@
+ from os.path import join, isdir
+ import sys
+ 
+-from keras.callbacks import ModelCheckpoint
++from keras.applications import VGG16, InceptionV3, Xception
++from keras.callbacks import ModelCheckpoint, EarlyStopping
+ from keras import applications, Model, Input
+-from keras.losses import BinaryCrossentropy
++from keras.losses import BinaryCrossentropy, sparse_categorical_crossentropy
++from keras.metrics import Accuracy, SparseCategoricalCrossentropy
+ from keras.optimizers import SGD, Adam
+ import numpy as np
+ from keras.preprocessing.image import ImageDataGenerator
+@@ -22,21 +24,26 @@
+ labels = []
+ features = []
+ train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
+-train_path = 'origin'
+-save_path = 'saved_files'
++train_path = 'Ready_For_Model_3Var'
++save_path = '../../backup/saved_files'
+ fixed_size = tuple((200, 200))
+ home = sys.path[0]
+ epochs = 20
+ sessions = 5
+ model_name = 'CNN_model'
+ history_name = 'CNN_history'
+-train_data_dir = 'v_data/origin'
++train_data_dir = 'v_data/train'
+ validation_data_dir = 'v_data/test'
+ nb_train_samples = 400
+ nb_validation_samples = 100
+ epochs = 10
+ batch_size = 32
+ 
++# configurations for the usage gpu_tensorflow
++config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
++config.gpu_options.allow_growth = True
++session = tf.compat.v1.Session(config=config)
++tf.compat.v1.keras.backend.set_session(session)
+ 
+ def save_files():
+     datagen = ImageDataGenerator(
+@@ -84,7 +91,6 @@
+ 
+ 
+ def import_data():
+-
+     # this is the augmentation configuration we will use for training
+     train_datagen = ImageDataGenerator(
+         rescale=1. / 255,
+@@ -94,7 +100,7 @@
+         validation_split=0.2)
+ 
+     # this is a generator that will read pictures found in
+-    # subfolers of 'data/origin', and indefinitely generate
++    # subfolers of 'data/train', and indefinitely generate
+     # batches of augmented image data
+     train_generator = train_datagen.flow_from_directory(
+         join(home, train_path),  # this is the target directory
+@@ -116,72 +122,50 @@
+ 
+ def build_model():
+     pass
+-    # # what is the image data format convention
+-    # if K.image_data_format() == "channels_first":
+-    #     input_shape = (3, fixed_size[0], fixed_size[1])
+-    # else:
+-    #     input_shape = (fixed_size[0], fixed_size[1], 3)
+-    # # Create base model
+-    # base_model = keras.applications.Xception(
+-    #     weights='imagenet',
+-    #     input_shape=(150, 150, 3),
+-    #     include_top=False)
+-    # # Freeze base model
+-    # base_model.trainable = False
+-    #
+-    # # Create new model on top.
+-    # inputs = Input(shape=(150, 150, 3))
+-    # x = base_model(inputs, training=False)
+-    # x = GlobalAveragePooling2D()(x)
+-    # outputs = Dense(1)(x)
+-    # model = Model(inputs, outputs)
+-    #
+-    # loss_fn = BinaryCrossentropy(from_logits=True)
+-    # optimizer = Adam()
+-    #
+-    # # # Iterate over the batches of a dataset.
+-    # # for inputs, targets in new_dataset:
+-    # #     # Open a GradientTape.
+-    # #     with tf.GradientTape() as tape:
+-    # #         # Forward pass.
+-    # #         predictions = model(inputs)
+-    # #         # Compute the loss value for this batch.
+-    # #         loss_value = loss_fn(targets, predictions)
+-    #
+-    #     # # Get gradients of loss wrt the *trainable* weights.
+-    #     # gradients = tape.gradient(loss_value, model.trainable_weights)
+-    #     # # Update the weights of the model.
+-    #     # optimizer.apply_gradients(zip(gradients, model.trainable_weights))
+-    #
+-    # return model
++    pretrained_model = VGG16(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
++    # We will not train the layers imported.
++    for layer in pretrained_model.layers:
++        layer.trainable = False
++    transfer_learning_model = Sequential()
++    transfer_learning_model.add(pretrained_model)
++    transfer_learning_model.add(Flatten())
++    transfer_learning_model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
++    transfer_learning_model.add(Dropout(0.5))
++    transfer_learning_model.add(Dense(3, activation='softmax'))
++    transfer_learning_model.summary()
++
++    return transfer_learning_model
+ 
+ 
+ def train_model(train_generator, validation_generator):
+-
+     model = build_model()
+     # checkpoint
+     filepath = "weights_best.hdf5"
+-    checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
+-    callbacks_list = [checkpoint]
+-
+-    # origin [sessions] models each [epochs] times
++    checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
++    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=3, verbose=1, restore_best_weights=True)
++    callbacks_list = [early_stopping, checkpoint]
++    optimizer = Adam()
++    model.compile(loss='sparse_categorical_crossentropy',
++                  optimizer=optimizer,
++                  metrics=['accuracy'])
++    # train [sessions] models each [epochs] times
+     max_acc = 0.0
+     for i in range(sessions):
+         # model training and evaluation
+         history = model.fit_generator(
+             train_generator,
+-            steps_per_epoch=2000 // batch_size,
+-            epochs=50,
++            steps_per_epoch=len(train_generator) // batch_size,
++            epochs=20,
+             validation_data=validation_generator,
+-            validation_steps=800 // batch_size
++            validation_steps=len(validation_generator) // batch_size
+             , verbose=2, callbacks=callbacks_list)
+         test_loss, test_acc = model.evaluate_generator(validation_generator, 500)
+         # save model if it performed better
+-        if test_acc > max_acc:
+-            max_acc = test_acc
+-            model.save(join(home, save_path, model_name))
+-            with open(join(home, save_path, history_name), 'wb') as file:
+-                pickle.dump(history.history, file)
++        # if test_acc > max_acc:
++        #     max_acc = test_acc
++        #     model.save(join(home, save_path, model_name))
++        #     with open(join(home, save_path, history_name), 'wb') as file:
++        #         pickle.dump(history.history, file)
+         print("accuracy: ", test_acc, "\n Loss:", test_loss)
+ 
+ 
+@@ -213,6 +197,7 @@
+     p = model.predict(image)
+     print(p)
+ 
++
+ try:
+     saved_files = listdir(join(home, save_path))
+     files_exist = [True for f in train_labels if saved_files.count(f + '.npy')]
+@@ -223,10 +208,8 @@
+     save_files()
+ 
+ train_generator, validation_generator = import_data()
+-# train_model(train_generator, validation_generator)
++train_model(train_generator, validation_generator)
+ # model = load_model(join(home, save_path, model_name))
+ # history = pickle.load(open(join(home, save_path, history_name), "rb"))
+ # plot_progress(history)
+-model = build_model()
+-model.load_weights("weights_best.hdf5")
+-print(model.evaluate_generator(validation_generator, 250))
+\ No newline at end of file
++# print(model.evaluate_generator(validation_generator, 250))
+Index: brute_approach.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import pickle\r\nfrom os import path, listdir, mkdir\r\nfrom os.path import join\r\nimport sys\r\nfrom keras.optimizers import SGD\r\n# import splitfolders as sf   - a good library for splitting dataset to train/val/test\r\nimport numpy as np\r\nfrom keras.preprocessing.image import ImageDataGenerator\r\nfrom keras.models import Sequential, load_model\r\nfrom keras.layers import Conv2D, MaxPooling2D\r\nfrom keras.layers import Activation, Dropout, Flatten, Dense\r\nfrom keras import backend as K\r\nfrom sklearn.model_selection import train_test_split, cross_val_score\r\nfrom keras.preprocessing.image import load_img\r\nfrom keras.preprocessing.image import img_to_array\r\nimport matplotlib.pyplot as plt\r\nimport tensorflow as tf\r\n\r\nlabels = []\r\nfeatures = []\r\ntrain_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']\r\ntrain_path = 'origin'\r\nsave_path = 'saved_files'\r\nfixed_size = tuple((200, 200))\r\nbins = 8\r\nh5_data = 'output/data.h5'\r\nh5_labels = 'output/labels.h5'\r\nhome = sys.path[0]\r\nepochs = 20\r\nsessions = 5\r\nmodel_name = 'CNN_model'\r\nhistory_name = 'CNN_history'\r\n\r\ndef import_data():\r\n\r\n    # this is the augmentation configuration we will use for training\r\n    train_datagen = ImageDataGenerator(\r\n        rescale=1. / 255,\r\n        shear_range=0.2,\r\n        zoom_range=0.2,\r\n        horizontal_flip=True,\r\n        validation_split=0.2)\r\n\r\n    # this is a generator that will read pictures found in\r\n    # subfolers of 'data/origin', and indefinitely generate\r\n    # batches of augmented image data\r\n    train_generator = train_datagen.flow_from_directory(\r\n        join(home, train_path),  # this is the target directory\r\n        target_size=fixed_size,  # all images will be resized to fixed_size\r\n        batch_size=batch_size,\r\n        class_mode='sparse',\r\n        subset='training')  # since we use categorical_crossentropy loss, we need categorical labels\r\n\r\n    # this is a similar generator, for validation data\r\n    validation_generator = train_datagen.flow_from_directory(\r\n        join(home, train_path),\r\n        target_size=fixed_size,\r\n        batch_size=batch_size,\r\n        class_mode='sparse',\r\n        subset='validation')\r\n\r\n    return train_generator, validation_generator\r\n\r\n\r\ndef train_model(x_train, y_train, x_test, y_test):\r\n    # what is the image data format convention\r\n    if K.image_data_format() == \"channels_first\":\r\n        input_shape = (3, fixed_size[0], fixed_size[1])\r\n    else:\r\n        input_shape = (fixed_size[0], fixed_size[1], 3)\r\n\r\n    # Building a CNN Model\r\n    model = Sequential()\r\n    model.add(\r\n        Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=input_shape))\r\n    model.add(MaxPooling2D((2, 2)))\r\n    model.add(Dropout(0.2))\r\n    model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))\r\n    model.add(MaxPooling2D((2, 2)))\r\n    model.add(Dropout(0.2))\r\n    model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))\r\n    model.add(MaxPooling2D((2, 2)))\r\n    model.add(Dropout(0.2))\r\n    model.add(Flatten())\r\n    model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))\r\n    model.add(Dropout(0.5))\r\n    model.add(Dense(3, activation='softmax'))\r\n    # compile model\r\n    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])\r\n\r\n    # origin [sessions] models each [epochs] times\r\n    max_acc = 0.0\r\n    for i in range(sessions):\r\n        # model training and evaluation\r\n        history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=epochs, verbose=2)\r\n        test_loss, test_acc = model.evaluate(x_test, y_test)\r\n        # save model if it performed better\r\n        if test_acc > max_acc:\r\n            max_acc = test_acc\r\n            model.save(join(home, save_path, model_name))\r\n            with open(join(home, save_path, history_name), 'wb') as file:\r\n                pickle.dump(history.history, file)\r\n        print(\"accuracy: \", test_acc, \"\\n Loss:\", test_loss)\r\n\r\n\r\ndef plot_progress(history):\r\n    acc = history['accuracy']\r\n    val_acc = history['val_accuracy']\r\n\r\n    loss = history['loss']\r\n    val_loss = history['val_loss']\r\n\r\n    epochs_range = range(epochs)\r\n\r\n    plt.figure(figsize=(8, 8))\r\n    plt.subplot(1, 2, 1)\r\n    plt.plot(epochs_range, acc, label='Training Accuracy')\r\n    plt.plot(epochs_range, val_acc, label='Validation Accuracy')\r\n    plt.legend(loc='lower right')\r\n    plt.title('Training and Validation Accuracy')\r\n\r\n    plt.subplot(1, 2, 2)\r\n    plt.plot(epochs_range, loss, label='Training Loss')\r\n    plt.plot(epochs_range, val_loss, label='Validation Loss')\r\n    plt.legend(loc='upper right')\r\n    plt.title('Training and Validation Loss')\r\n    plt.show()\r\n\r\n\r\ndef predict(model, image):\r\n    test_datagen = ImageDataGenerator(rescale=1. / 255)\r\n\r\n    test_generator = test_datagen.flow_from_directory(\r\n        test_dir,\r\n        target_size=(200, 200),\r\n        color_mode=\"rgb\",\r\n        shuffle=False,\r\n        class_mode='categorical',\r\n        batch_size=1)\r\n\r\n    filenames = test_generator.filenames\r\n    nb_samples = len(filenames)\r\n\r\n    predict = model.predict_generator(test_generator, steps=nb_samples)\r\n\r\n\r\ntry:\r\n    saved_files = listdir(join(home, save_path))\r\n    files_exist = [True for f in train_labels if saved_files.count(f + '.npy')]\r\n    if files_exist.count(False) != 0 or len(files_exist) == 0:\r\n        save_files()\r\nexcept OSError as e:\r\n    mkdir(join(home, save_path))\r\n    save_files()\r\n\r\n# x_train, x_test, y_train, y_test = import_data()\r\n# train_model(x_train, y_train, x_test, y_test)\r\n# model = load_model(join(home, save_path, model_name))\r\n# model\r\n# history = pickle.load(open(join(home, save_path, history_name), \"rb\"))\r\n# plot_progress(history)\r\nseperate()\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- brute_approach.py	(revision 1d7a560b66a1aa1325de5c16bf181b7b5ade1bcf)
++++ brute_approach.py	(date 1597316281310)
+@@ -144,19 +144,9 @@
+     predict = model.predict_generator(test_generator, steps=nb_samples)
+ 
+ 
+-try:
+-    saved_files = listdir(join(home, save_path))
+-    files_exist = [True for f in train_labels if saved_files.count(f + '.npy')]
+-    if files_exist.count(False) != 0 or len(files_exist) == 0:
+-        save_files()
+-except OSError as e:
+-    mkdir(join(home, save_path))
+-    save_files()
+-
+ # x_train, x_test, y_train, y_test = import_data()
+ # train_model(x_train, y_train, x_test, y_test)
+ # model = load_model(join(home, save_path, model_name))
+ # model
+ # history = pickle.load(open(join(home, save_path, history_name), "rb"))
+ # plot_progress(history)
+-seperate()
+Index: .idea/misc.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"ProjectRootManager\" version=\"2\" project-jdk-name=\"Python 3.7 (date_classification)\" project-jdk-type=\"Python SDK\" />\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/misc.xml	(revision 1d7a560b66a1aa1325de5c16bf181b7b5ade1bcf)
++++ .idea/misc.xml	(date 1597316033538)
+@@ -1,4 +1,4 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
+-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.7 (date_classification)" project-jdk-type="Python SDK" />
++  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.7 (tensorflow_gpuenv)" project-jdk-type="Python SDK" />
+ </project>
+\ No newline at end of file
+Index: .idea/date_classification.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<module type=\"PYTHON_MODULE\" version=\"4\">\r\n  <component name=\"NewModuleRootManager\">\r\n    <content url=\"file://$MODULE_DIR$\" />\r\n    <orderEntry type=\"jdk\" jdkName=\"Python 3.7 (date_classification)\" jdkType=\"Python SDK\" />\r\n    <orderEntry type=\"sourceFolder\" forTests=\"false\" />\r\n  </component>\r\n</module>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/date_classification.iml	(revision 1d7a560b66a1aa1325de5c16bf181b7b5ade1bcf)
++++ .idea/date_classification.iml	(date 1597316033538)
+@@ -2,7 +2,7 @@
+ <module type="PYTHON_MODULE" version="4">
+   <component name="NewModuleRootManager">
+     <content url="file://$MODULE_DIR$" />
+-    <orderEntry type="jdk" jdkName="Python 3.7 (date_classification)" jdkType="Python SDK" />
++    <orderEntry type="jdk" jdkName="Python 3.7 (tensorflow_gpuenv)" jdkType="Python SDK" />
+     <orderEntry type="sourceFolder" forTests="false" />
+   </component>
+ </module>
+\ No newline at end of file

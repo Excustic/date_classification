@@ -32,8 +32,9 @@ epochs = 20
 sessions = 5
 model_name = 'CNN_model'
 history_name = 'CNN_history'
-train_data_dir = 'v_data/train'
-validation_data_dir = 'v_data/test'
+train_data_dir = 'split/train'
+validation_data_dir = 'split/val'
+test_data_dir = 'split/test'
 nb_train_samples = 400
 nb_validation_samples = 100
 epochs = 10
@@ -91,6 +92,7 @@ def save_files():
 
 
 def import_data():
+
     # this is the augmentation configuration we will use for training
     train_datagen = ImageDataGenerator(
         rescale=1. / 255,
@@ -107,7 +109,7 @@ def import_data():
         target_size=fixed_size,  # all images will be resized to fixed_size
         batch_size=batch_size,
         class_mode='sparse',
-        subset='training')  # since we use categorical_crossentropy loss, we need categorical labels
+        )  # since we use categorical_crossentropy loss, we need categorical labels
 
     # this is a similar generator, for validation data
     validation_generator = train_datagen.flow_from_directory(
@@ -115,7 +117,7 @@ def import_data():
         target_size=fixed_size,
         batch_size=batch_size,
         class_mode='sparse',
-        subset='validation')
+        )
 
     return train_generator, validation_generator
 
@@ -138,6 +140,7 @@ def build_model():
 
 
 def train_model(train_generator, validation_generator):
+
     model = build_model()
     # checkpoint
     filepath = "weights_best.hdf5"
@@ -154,10 +157,10 @@ def train_model(train_generator, validation_generator):
         # model training and evaluation
         history = model.fit_generator(
             train_generator,
-            steps_per_epoch=len(train_generator) // batch_size,
+            steps_per_epoch=train_generator.samples // batch_size,
             epochs=20,
             validation_data=validation_generator,
-            validation_steps=len(validation_generator) // batch_size
+            validation_steps=validation_generator.samples // batch_size
             , verbose=2, callbacks=callbacks_list)
         test_loss, test_acc = model.evaluate_generator(validation_generator, 500)
         # save model if it performed better
