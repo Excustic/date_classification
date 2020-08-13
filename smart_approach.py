@@ -22,7 +22,7 @@ import tensorflow as tf
 labels = []
 features = []
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'Ready_For_Model_3Var'
+train_path = 'origin'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 home = sys.path[0]
@@ -30,7 +30,7 @@ epochs = 20
 sessions = 5
 model_name = 'CNN_model'
 history_name = 'CNN_history'
-train_data_dir = 'v_data/train'
+train_data_dir = 'v_data/origin'
 validation_data_dir = 'v_data/test'
 nb_train_samples = 400
 nb_validation_samples = 100
@@ -94,7 +94,7 @@ def import_data():
         validation_split=0.2)
 
     # this is a generator that will read pictures found in
-    # subfolers of 'data/train', and indefinitely generate
+    # subfolers of 'data/origin', and indefinitely generate
     # batches of augmented image data
     train_generator = train_datagen.flow_from_directory(
         join(home, train_path),  # this is the target directory
@@ -164,7 +164,7 @@ def train_model(train_generator, validation_generator):
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
     callbacks_list = [checkpoint]
 
-    # train [sessions] models each [epochs] times
+    # origin [sessions] models each [epochs] times
     max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation

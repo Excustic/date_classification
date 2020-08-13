@@ -3,6 +3,7 @@ from os import path, listdir, mkdir
 from os.path import join
 import sys
 from keras.optimizers import SGD
+# import splitfolders as sf   - a good library for splitting dataset to train/val/test
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, load_model
@@ -18,7 +19,7 @@ import tensorflow as tf
 labels = []
 features = []
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'Ready_For_Model_3Var'
+train_path = 'origin'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
@@ -30,47 +31,35 @@ sessions = 5
 model_name = 'CNN_model'
 history_name = 'CNN_history'
 
-
-def save_files():
-    # loop over the training data sub-folders
-    for training_name in train_labels:
-
-        photos = []
-
-        # join the training data path and each species training folder
-        dir = join(home, train_path, training_name)
-
-        # get the current training label
-        current_label = training_name.split('_')[1]
-
-        # loop over the images in each sub-folder
-        for filename in listdir(dir):
-            # avoid non jpg files
-            if filename.split('.')[1] != "jpg":
-                continue
-            # load image
-            photo = load_img(join(dir, filename), target_size=fixed_size)
-            # convert to numpy array
-            photo = img_to_array(photo) / 255.0
-            # store
-            photos.append(photo)
-
-        # convert to a numpy array
-        photos = np.asarray(photos)
-
-        # save the photos as numpy array
-        np.save(join(home, save_path, training_name + '.npy'), photos)
-
-
 def import_data():
-    seed = 11
-    test_size = 0.10
-    x = np.array(tuple(np.load(join(home, save_path, train_labels[i] + '.npy')) for i in range(3)))
-    y = np.array(tuple(np.array([i] * len(x[i])) for i in range(3)))
-    X = np.vstack(x)
-    labels = np.hstack(y)
-    # split the training and testing data
-    return train_test_split(X, labels, test_size=test_size, random_state=seed)
+
+    # this is the augmentation configuration we will use for training
+    train_datagen = ImageDataGenerator(
+        rescale=1. / 255,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        validation_split=0.2)
+
+    # this is a generator that will read pictures found in
+    # subfolers of 'data/origin', and indefinitely generate
+    # batches of augmented image data
+    train_generator = train_datagen.flow_from_directory(
+        join(home, train_path),  # this is the target directory
+        target_size=fixed_size,  # all images will be resized to fixed_size
+        batch_size=batch_size,
+        class_mode='sparse',
+        subset='training')  # since we use categorical_crossentropy loss, we need categorical labels
+
+    # this is a similar generator, for validation data
+    validation_generator = train_datagen.flow_from_directory(
+        join(home, train_path),
+        target_size=fixed_size,
+        batch_size=batch_size,
+        class_mode='sparse',
+        subset='validation')
+
+    return train_generator, validation_generator
 
 
 def train_model(x_train, y_train, x_test, y_test):
@@ -99,7 +88,7 @@ def train_model(x_train, y_train, x_test, y_test):
     # compile model
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    # train [sessions] models each [epochs] times
+    # origin [sessions] models each [epochs] times
     max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation
@@ -139,8 +128,20 @@ def plot_progress(history):
 
 
 def predict(model, image):
-    p = model.predict(image)
-    print(p)
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+    test_generator = test_datagen.flow_from_directory(
+        test_dir,
+        target_size=(200, 200),
+        color_mode="rgb",
+        shuffle=False,
+        class_mode='categorical',
+        batch_size=1)
+
+    filenames = test_generator.filenames
+    nb_samples = len(filenames)
+
+    predict = model.predict_generator(test_generator, steps=nb_samples)
 
 
 try:
@@ -155,5 +156,7 @@ except OSError as e:
 # x_train, x_test, y_train, y_test = import_data()
 # train_model(x_train, y_train, x_test, y_test)
 # model = load_model(join(home, save_path, model_name))
-history = pickle.load(open(join(home, save_path, history_name), "rb"))
-plot_progress(history)
+# model
+# history = pickle.load(open(join(home, save_path, history_name), "rb"))
+# plot_progress(history)
+seperate()

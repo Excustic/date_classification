@@ -1,3 +1,4 @@
-/Ready_For_Model_3Var
-/saved_files
+origin/
+saved_files/
+split/
 *.hdf5
