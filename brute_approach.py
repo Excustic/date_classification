@@ -19,7 +19,7 @@ labels = []
 features = []
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
 train_path = 'Ready_For_Model_3Var'
-save_path = 'saved_files'
+save_path = '../../backup/saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
 h5_data = 'output/data.h5'
@@ -29,6 +29,12 @@ epochs = 20
 sessions = 5
 model_name = 'CNN_model'
 history_name = 'CNN_history'
+
+# configurations for the usage gpu_tensorflow
+config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 
 def save_files():
@@ -152,8 +158,8 @@ except OSError as e:
     mkdir(join(home, save_path))
     save_files()
 
-# x_train, x_test, y_train, y_test = import_data()
-# train_model(x_train, y_train, x_test, y_test)
-# model = load_model(join(home, save_path, model_name))
+x_train, x_test, y_train, y_test = import_data()
+train_model(x_train, y_train, x_test, y_test)
+model = load_model(join(home, save_path, model_name))
 history = pickle.load(open(join(home, save_path, history_name), "rb"))
 plot_progress(history)
