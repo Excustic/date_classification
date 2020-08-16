@@ -1,4 +1,5 @@
 origin/
 saved_files/
 split/
+.idea/
 *.hdf5

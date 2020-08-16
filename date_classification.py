@@ -8,6 +8,7 @@ import numpy as np
 from tensorflow.keras import backend as K, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from tensorflow.keras.models import load_model
+from tensorflow.keras.models import save_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
@@ -28,24 +29,24 @@ bins = 8
 home = sys.path[0]
 epochs = 20
 sessions = 5
-model_name = 'CNN_model'
+model_name = 'CNN_model.h5'
 history_name = 'CNN_history'
 batch_size = 32
 
 def import_data():
 
     # this is the augmentation configuration we will use for training
+    # you can tinker with values to avoid over-fitting or under-fitting; I found these values to do well
     datagen = ImageDataGenerator(
-        rescale=1. / 255,
+        rescale=1. / 255,  # rescale pixel values from 0-255 to 0-1 so the data would be normalized
         shear_range=0.2,
         zoom_range=0.2,
         horizontal_flip=True,
         )
     val_datagen = ImageDataGenerator(rescale=1. / 255)
-    # this is the augmentation configuration we will use for training
+
     # this is a generator that will read pictures found in
-    # subfolers of 'data/origin', and indefinitely generate
-    # batches of augmented image data
+    # sub-folders and indefinitely generate batches of augmented image data
     train_generator = datagen.flow_from_directory(
         join(home, train_path),  # this is the target directory
         target_size=fixed_size,  # all images will be resized to fixed_size
@@ -83,13 +84,13 @@ def train_model(train_generator, validation_generator):
     # Building a CNN Model
     model = Sequential()
     model.add(
-        Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=input_shape))
+        Conv2D(32, (5, 5), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=input_shape))
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(64, (5, 5), activation='relu', kernel_initializer='he_uniform', padding='same'))
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(128, (5, 5), activation='relu', kernel_initializer='he_uniform', padding='same'))
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
     model.add(Flatten())
@@ -97,11 +98,11 @@ def train_model(train_generator, validation_generator):
     model.add(Dropout(0.5))
     model.add(Dense(3, activation='softmax'))
     # compile model
-    opt = Adam()
+    opt = Adam(learning_rate=.0003)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     filepath = "weights_best.hdf5"
-    checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=10, verbose=1, restore_best_weights=True)
+    checkpoint = ModelCheckpoint(join(save_path, filepath), monitor='val_accuracy', save_best_only=True, mode='max')
+    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=5, verbose=1, restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
@@ -109,20 +110,21 @@ def train_model(train_generator, validation_generator):
     max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation
-        history = model.fit_generator(
+        history = model.fit(
             train_generator,
             steps_per_epoch=train_generator.samples // batch_size,
             epochs=20,
             validation_data=validation_generator,
             validation_steps=validation_generator.samples // batch_size
             , verbose=2, callbacks=callbacks_list)
-        test_loss, test_acc = model.evaluate_generator(test_generator, test_generator.samples)
+        model.load_weights(join(save_path, filepath))
+        test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
         # save model if it performed better
-        if test_acc > max_acc:
-            max_acc = test_acc
-            model.save(join(home, save_path, model_name))
-            with open(join(home, save_path, history_name), 'wb') as file:
-                pickle.dump(history.history, file)
+        # if test_acc > max_acc:
+        #     max_acc = test_acc
+        #     model.save(join(home, save_path, model_name))
+        #     with open(join(home, save_path, history_name), 'wb') as file:
+        #         pickle.dump(history.history, file)
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
 
 
@@ -157,7 +159,7 @@ def calc_activations(model):
 
     test_generator = test_datagen.flow_from_directory(
         test_path,
-        target_size=(200, 200),
+        target_size=fixed_size,
         color_mode="rgb",
         shuffle=True,
         class_mode='sparse',
@@ -169,7 +171,8 @@ def calc_activations(model):
     return activations, y
 
 
-def display_activation(model, activations, y, col_size, row_size, act_index):
+def display_activation(model, col_size, row_size, act_index):
+    activations, y = calc_activations(model)
     activation = activations[act_index]
     activation_index = 0
     fig, ax = plt.subplots(row_size, col_size, figsize=(row_size * 2.5, col_size * 1.5))
@@ -182,19 +185,33 @@ def display_activation(model, activations, y, col_size, row_size, act_index):
     plt.show()
 
 
-train_gen, val_gen = import_data()
-train_model(train_gen, val_gen)
+# train_gen, val_gen = import_data()
+# train_model(train_gen, val_gen)
 model = load_model(join(home, save_path, model_name))
-plot_model(model, to_file=join(home, save_path, 'model.png'))
-while str(input()) != 'q':
-    activations, y = calc_activations(model)
-    layer_num = int(input())
-    while layer_num != -1:
-        try:
-            display_activation(model, activations, y, 8, 4, layer_num)
-        except Exception as e:
-            print("failed - " + str(e))
-        layer_num = int(input())
+model.load_weights(join(save_path, 'weights_best.hdf5'))
+test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+test_generator = test_datagen.flow_from_directory(
+    test_path,
+    target_size=(200, 200),
+    color_mode="rgb",
+    shuffle=True,
+    class_mode='sparse',
+    batch_size=batch_size)
+test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
+model.save(join(home, save_path, model_name))
+# activations, y = calc_activations(model)
+# display_activation(model, activations, y, 8, 4, 3)
+# plot_model(model, to_file=join(home, save_path, 'model.png'))
+# while str(input()) != 'q':
+#     activations, y = calc_activations(model)
+#     layer_num = int(input())
+#     while layer_num != -1:
+#         try:
+#             display_activation(model, activations, y, 8, 4, layer_num)
+#         except Exception as e:
+#             print("failed - " + str(e))
+#         layer_num = int(input())
 
 # model
 # history = pickle.load(open(join(home, save_path, history_name), "rb"))
