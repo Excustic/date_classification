@@ -4,14 +4,15 @@ import datetime
 from os.path import join
 
 import matplotlib.pyplot as plt
-import numpy as np
+import tensorflow as tf
 from tensorflow.keras import backend as K, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
-# import splitfolders as sf   - a good library for splitting dataset to train/val/test
+import splitfolders as sf
+""""- a good library for splitting dataset to train/val/test"""
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow_core.python.keras.utils.vis_utils import plot_model
@@ -23,6 +24,7 @@ train_path = 'split\\train'
 valid_path = 'split\\val'
 test_path = 'split\\test'
 save_path = 'saved_files'
+origin_path = 'Ready_For_Model_3Var'
 fixed_size = tuple((200, 200))
 bins = 8
 home = sys.path[0]
@@ -30,7 +32,13 @@ epochs = 20
 sessions = 5
 model_name = 'CNN_model'
 history_name = 'CNN_history'
-batch_size = 32
+batch_size = 64
+
+# configurations for the usage gpu_tensorflow
+config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 def import_data():
 
@@ -76,7 +84,7 @@ def train_model(train_generator, validation_generator):
         test_path,
         target_size=(200, 200),
         color_mode="rgb",
-        shuffle=True,
+        shuffle=False,
         class_mode='sparse',
         batch_size=batch_size)
 
@@ -101,7 +109,7 @@ def train_model(train_generator, validation_generator):
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     filepath = "weights_best.hdf5"
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=10, verbose=1, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=10, verbose=2, restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
@@ -109,14 +117,14 @@ def train_model(train_generator, validation_generator):
     max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation
-        history = model.fit_generator(
+        history = model.fit(
             train_generator,
-            steps_per_epoch=train_generator.samples // batch_size,
+            steps_per_epoch=len(train_generator),
             epochs=20,
             validation_data=validation_generator,
-            validation_steps=validation_generator.samples // batch_size
+            validation_steps=len(validation_generator)
             , verbose=2, callbacks=callbacks_list)
-        test_loss, test_acc = model.evaluate_generator(test_generator, test_generator.samples)
+        test_loss, test_acc = model.evaluate(test_generator, steps=test_generator.samples)
         # save model if it performed better
         if test_acc > max_acc:
             max_acc = test_acc
@@ -180,7 +188,6 @@ def display_activation(model, activations, y, col_size, row_size, act_index):
     fig.tight_layout(pad=1.6)
     fig.suptitle(train_labels[int(y[0])]+", Layer "+str(model.layers[act_index].name))
     plt.show()
-
 
 train_gen, val_gen = import_data()
 train_model(train_gen, val_gen)
