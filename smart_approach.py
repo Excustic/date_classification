@@ -1,10 +1,12 @@
 import datetime
+import multiprocessing
 import pickle
 from os import path, listdir, mkdir
 from os.path import join, isdir
 import sys
 
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
+import tensorflow.keras.backend as K
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import save_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
@@ -15,7 +17,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.applications import VGG16, ResNet50
+from tensorflow.keras.applications import InceptionV3, ResNet50
 
 labels = []
 features = []
@@ -27,10 +29,10 @@ save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
 home = sys.path[0]
-epochs = 20
-sessions = 5
-model_name = 'CNN_model.h5'
-history_name = 'CNN_history'
+epochs = 100
+sessions = 1
+model_name = 'InceptionV3_model.h5'
+history_name = 'InceptionV3_history'
 batch_size = 32
 
 # configurations for the usage gpu_tensorflow
@@ -73,7 +75,7 @@ def import_data():
 
 
 def build_model():
-    pretrained_model = ResNet50(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
+    pretrained_model = InceptionV3(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
     # We will not train the layers imported.
     for layer in pretrained_model.layers:
         layer.trainable = False
@@ -84,7 +86,7 @@ def build_model():
     transfer_learning_model.add(Dropout(0.5))
     transfer_learning_model.add(Dense(3, activation='softmax'))
     transfer_learning_model.summary()
-    opt = Adam()
+    opt = Adam(learning_rate=.0003)
     transfer_learning_model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return transfer_learning_model
 
@@ -103,8 +105,8 @@ def train_model(train_generator, validation_generator):
     # checkpoint
     filepath = join(save_path, "weights_best_smart.hdf5")
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=6, verbose=1, restore_best_weights=True)
-    log_dir = join(home, save_path, 'logs', 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=6, verbose=1, restore_best_weights=True)
+    log_dir = join(home, save_path, 'logs', 'fit_smart', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
     # origin [sessions] models each [epochs] times
@@ -113,14 +115,15 @@ def train_model(train_generator, validation_generator):
         history = model.fit(
             train_generator,
             steps_per_epoch=train_generator.samples // batch_size,
-            epochs=20,
+            epochs=epochs,
             validation_data=validation_generator,
             validation_steps=validation_generator.samples // batch_size
-            , verbose=2, callbacks=callbacks_list)
-        model.load_weights(join(save_path, filepath))
+            , verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
+            use_multiprocessing=False)
+        model.load_weights(join(filepath))
         test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
-
+        K.clear_session()
 
 def plot_progress(history):
     acc = history['accuracy']

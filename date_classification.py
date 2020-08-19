@@ -1,3 +1,5 @@
+import json
+import multiprocessing
 import pickle
 import sys
 import datetime
@@ -5,10 +7,10 @@ from os.path import join
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 from tensorflow.keras import backend as K, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from tensorflow.keras.models import load_model
-from tensorflow.keras.models import save_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
@@ -27,14 +29,14 @@ save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
 home = sys.path[0]
-epochs = 20
-sessions = 5
+epochs = 100
+sessions = 1
 model_name = 'CNN_model.h5'
 history_name = 'CNN_history'
-batch_size = 32
+batch_size = 64
+
 
 def import_data():
-
     # this is the augmentation configuration we will use for training
     # you can tinker with values to avoid over-fitting or under-fitting; I found these values to do well
     datagen = ImageDataGenerator(
@@ -42,7 +44,7 @@ def import_data():
         shear_range=0.2,
         zoom_range=0.2,
         horizontal_flip=True,
-        )
+    )
     val_datagen = ImageDataGenerator(rescale=1. / 255)
 
     # this is a generator that will read pictures found in
@@ -52,7 +54,7 @@ def import_data():
         target_size=fixed_size,  # all images will be resized to fixed_size
         batch_size=batch_size,
         class_mode='sparse',
-        )  # since we use categorical_crossentropy loss, we need categorical labels
+    )  # since we use categorical_crossentropy loss, we need categorical labels
 
     # this is a similar generator, for validation data
     validation_generator = val_datagen.flow_from_directory(
@@ -60,7 +62,7 @@ def import_data():
         target_size=fixed_size,
         batch_size=batch_size,
         class_mode='sparse',
-        )
+    )
 
     return train_generator, validation_generator
 
@@ -98,11 +100,12 @@ def train_model(train_generator, validation_generator):
     model.add(Dropout(0.5))
     model.add(Dense(3, activation='softmax'))
     # compile model
-    opt = Adam(learning_rate=.0003)
+    opt = Adam(learning_rate=.0008)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     filepath = "weights_best.hdf5"
     checkpoint = ModelCheckpoint(join(save_path, filepath), monitor='val_accuracy', save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='loss', min_delta=0, patience=5, verbose=1, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=epochs // 5, verbose=1,
+                                   restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
@@ -113,18 +116,19 @@ def train_model(train_generator, validation_generator):
         history = model.fit(
             train_generator,
             steps_per_epoch=train_generator.samples // batch_size,
-            epochs=20,
+            epochs=epochs,
             validation_data=validation_generator,
             validation_steps=validation_generator.samples // batch_size
-            , verbose=2, callbacks=callbacks_list)
+            , verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
+            use_multiprocessing=False)
         model.load_weights(join(save_path, filepath))
         test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
         # save model if it performed better
-        # if test_acc > max_acc:
-        #     max_acc = test_acc
-        #     model.save(join(home, save_path, model_name))
-        #     with open(join(home, save_path, history_name), 'wb') as file:
-        #         pickle.dump(history.history, file)
+        if test_acc > max_acc:
+            max_acc = test_acc
+            model.save(join(home, save_path, model_name))
+            with open(join(home, save_path, history_name), 'wb') as file:
+                pickle.dump(history.history, file)
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
 
 
@@ -152,7 +156,7 @@ def plot_progress(history):
     plt.show()
 
 
-def calc_activations(model):
+def calc_activations(model, index):
     layer_outputs = [layer.output for layer in model.layers]
     activation_model = Model(inputs=model.input, outputs=layer_outputs)
     test_datagen = ImageDataGenerator(rescale=1. / 255)
@@ -165,14 +169,14 @@ def calc_activations(model):
         class_mode='sparse',
         batch_size=1)
 
-    x, y = test_generator.next()
+    x, _ = test_generator._get_batches_of_transformed_samples([index])
+    filename = test_generator.filenames[index]
     activations = activation_model.predict(x)
 
-    return activations, y
+    return activations, filename
 
 
-def display_activation(model, col_size, row_size, act_index):
-    activations, y = calc_activations(model)
+def display_activation(model, activations, name, col_size, row_size, act_index):
     activation = activations[act_index]
     activation_index = 0
     fig, ax = plt.subplots(row_size, col_size, figsize=(row_size * 2.5, col_size * 1.5))
@@ -181,38 +185,68 @@ def display_activation(model, col_size, row_size, act_index):
             ax[row][col].imshow(activation[0, :, :, activation_index], cmap='autumn')
             activation_index += 1
     fig.tight_layout(pad=1.6)
-    fig.suptitle(train_labels[int(y[0])]+", Layer "+str(model.layers[act_index].name))
+    fig.suptitle(name + ", Layer " + str(model.layers[act_index].name))
     plt.show()
 
 
-# train_gen, val_gen = import_data()
+def test_log(model):
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+    test_generator = test_datagen.flow_from_directory(
+        test_path,
+        target_size=(200, 200),
+        color_mode="rgb",
+        shuffle=True,
+        class_mode='sparse',
+        batch_size=1)
+    print(model.evaluate(test_generator, steps=len(test_generator)))
+    PR = ([], [], [])
+    for i in range(test_generator.samples):
+        x, y = test_generator._get_batches_of_transformed_samples([i])
+        filepath = test_generator.filepaths[i]
+        p = model.predict(x).tolist()[0]
+        PR[int(y[0])].append(int(y[0]) == p.index(max(p)))
+        print("pred - ", train_labels[p.index(max(p))], " | real - ", train_labels[int(y[0])], "| conf - ", max(p),
+              "| f:", filepath)
+    for i in range(3):
+        print(train_labels[i], ": ", PR[i].count(True), "/", len(PR[i]), "correct - ",
+              (PR[i].count(True) / len(PR[i]) * 100),
+              "accuracy")
+
+
+def visualize(model):
+    index = 0
+    while str(input()) != 'q':
+        activations, name = calc_activations(model, index)
+        layer_num = int(input())
+        while layer_num != -1:
+            try:
+                display_activation(model, activations, name, 8, 4, layer_num)
+            except Exception as e:
+                print("failed - " + str(e))
+            layer_num = int(input())
+        index += 1
+
+def predict(filepath, filename):
+    model = load_model(join(home, save_path, model_name))
+    model.load_weights(join(save_path, 'weights_best.hdf5'))
+    img = Image.open(join(filepath, filename))
+    img = img.resize(fixed_size)
+    img = np.array(img)
+    img = img / 255.0
+    img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
+    p = model.predict(img).tolist()[0]
+    result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
+    with open(join(filepath, 'result.json'), 'w') as f:
+        json.dump(result, f)
+    return result
+
+     # train_gen, val_gen = import_data()
 # train_model(train_gen, val_gen)
-model = load_model(join(home, save_path, model_name))
-model.load_weights(join(save_path, 'weights_best.hdf5'))
-test_datagen = ImageDataGenerator(rescale=1. / 255)
-
-test_generator = test_datagen.flow_from_directory(
-    test_path,
-    target_size=(200, 200),
-    color_mode="rgb",
-    shuffle=True,
-    class_mode='sparse',
-    batch_size=batch_size)
-test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
-model.save(join(home, save_path, model_name))
-# activations, y = calc_activations(model)
-# display_activation(model, activations, y, 8, 4, 3)
-# plot_model(model, to_file=join(home, save_path, 'model.png'))
-# while str(input()) != 'q':
-#     activations, y = calc_activations(model)
-#     layer_num = int(input())
-#     while layer_num != -1:
-#         try:
-#             display_activation(model, activations, y, 8, 4, layer_num)
-#         except Exception as e:
-#             print("failed - " + str(e))
-#         layer_num = int(input())
-
+# model = load_model(join(home, save_path, model_name))
+# model.load_weights(join(save_path, 'weights_best.hdf5'))
+# model.save(join(home, save_path, model_name))
+# visualize()
 # model
 # history = pickle.load(open(join(home, save_path, history_name), "rb"))
 # plot_progress(history)
