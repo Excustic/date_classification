@@ -8,21 +8,14 @@ __maintainer__ = "Michael Kushnir"
 __email__ = "michaelkushnir123233@gmail.com"
 __status__ = "prototype"
 
-import errno
-import json
 import os
 import random
 import string
 import sys
 from threading import Thread
-import time
-
 import cv2
 import numpy as np
-import requests
-from PIL import Image
-from flask import Flask, request, flash, url_for, render_template
-from os import path
+from flask import Flask, request, flash, render_template
 from os.path import join
 import date_classification as clf
 from werkzeug.utils import redirect, secure_filename
@@ -53,8 +46,8 @@ def is_similar(local_img, server_img):
     return err == 0
 
 
-@app.route('/predict', methods=['GET', 'POST'])
-def predict():
+@app.route('/score', methods=['GET', 'POST'])
+def score():
     if request.method == 'POST':
         res_json = None
         # check if the post request has the file part
@@ -71,6 +64,8 @@ def predict():
             filename = secure_filename(file.filename)
             filepath = join(app.config['UPLOAD_FOLDER'], filename.split('.')[0])
             try:
+                if not os.path.isdir(app.config['UPLOAD_FOLDER']):
+                    os.mkdir(app.config['UPLOAD_FOLDER'])
                 # check if there's an actual duplicate or just same name
                 if os.path.isdir(filepath):
                     # make a new folder if there's a file with the same name
@@ -80,7 +75,7 @@ def predict():
                     filepath = filepath+rand_str
                 os.mkdir(filepath)
                 file.save(join(filepath, filename))
-                res_json = clf.predict(filepath, filename)
+                res_json = clf.score(filepath, filename)
             except Exception as e:
                 print(e)
         return res_json

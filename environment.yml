@@ -1,0 +1,9 @@
+name: date_classification_docker
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+  - tensorflow-gpu
+  - flask
+  - opencv
+prefix: C:\Users\Shay\anaconda3\envs\date_classification(1)

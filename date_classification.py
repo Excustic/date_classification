@@ -17,7 +17,6 @@ from tensorflow.keras.models import Sequential
 # import splitfolders as sf   - a good library for splitting dataset to train/val/test
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow_core.python.keras.utils.vis_utils import plot_model
 
 labels = []
 features = []
@@ -34,7 +33,8 @@ sessions = 1
 model_name = 'CNN_model.h5'
 history_name = 'CNN_history'
 batch_size = 64
-
+loaded_model = load_model(join(home, save_path, model_name))
+loaded_model.load_weights(join(save_path, 'weights_best.hdf5'))
 
 def import_data():
     # this is the augmentation configuration we will use for training
@@ -204,7 +204,7 @@ def test_log(model):
     for i in range(test_generator.samples):
         x, y = test_generator._get_batches_of_transformed_samples([i])
         filepath = test_generator.filepaths[i]
-        p = model.predict(x).tolist()[0]
+        p = model.score(x, ).tolist()[0]
         PR[int(y[0])].append(int(y[0]) == p.index(max(p)))
         print("pred - ", train_labels[p.index(max(p))], " | real - ", train_labels[int(y[0])], "| conf - ", max(p),
               "| f:", filepath)
@@ -227,15 +227,13 @@ def visualize(model):
             layer_num = int(input())
         index += 1
 
-def predict(filepath, filename):
-    model = load_model(join(home, save_path, model_name))
-    model.load_weights(join(save_path, 'weights_best.hdf5'))
+def score(filepath, filename):
     img = Image.open(join(filepath, filename))
     img = img.resize(fixed_size)
     img = np.array(img)
     img = img / 255.0
     img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
-    p = model.predict(img).tolist()[0]
+    p = loaded_model.score(img, ).tolist()[0]
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     with open(join(filepath, 'result.json'), 'w') as f:
         json.dump(result, f)

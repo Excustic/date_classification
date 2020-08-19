@@ -1,15 +1,10 @@
 import datetime
 import multiprocessing
-import pickle
-from os import path, listdir, mkdir
-from os.path import join, isdir
+from os.path import join
 import sys
 
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 import tensorflow.keras.backend as K
-from tensorflow.keras.models import load_model
-from tensorflow.keras.models import save_model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
 # import splitfolders as sf   - a good library for splitting dataset to train/val/test
@@ -17,7 +12,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.applications import InceptionV3, ResNet50
+from tensorflow.keras.applications import VGG16
 
 labels = []
 features = []
@@ -75,7 +70,7 @@ def import_data():
 
 
 def build_model():
-    pretrained_model = InceptionV3(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
+    pretrained_model = VGG16(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
     # We will not train the layers imported.
     for layer in pretrained_model.layers:
         layer.trainable = False
@@ -150,7 +145,7 @@ def plot_progress(history):
 
 
 def predict(model, image):
-    p = model.predict(image)
+    p = model.score(image, )
     print(p)
 
 train_generator, validation_generator = import_data()
