@@ -12,13 +12,13 @@ import os
 import random
 import string
 import sys
-from threading import Thread
 import cv2
 import numpy as np
 from flask import Flask, request, flash, render_template
 from os.path import join
 import date_classification as clf
 from werkzeug.utils import redirect, secure_filename
+import logging
 
 home = sys.path[0]
 app = Flask(__name__)
@@ -83,5 +83,4 @@ def score():
 
 
 if __name__ == '__main__':
-    t = Thread(target=app.run, args=())
-    t.start()
+    app.run(host='0.0.0.0', port=80)
