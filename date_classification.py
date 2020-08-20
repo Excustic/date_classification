@@ -233,7 +233,7 @@ def score(filepath, filename):
     img = np.array(img)
     img = img / 255.0
     img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
-    p = loaded_model.score(img, ).tolist()[0]
+    p = loaded_model.predict(img).tolist()[0]
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     with open(join(filepath, 'result.json'), 'w') as f:
         json.dump(result, f)

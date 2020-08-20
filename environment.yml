@@ -6,4 +6,6 @@ dependencies:
   - tensorflow-gpu
   - flask
   - opencv
+  - matplotlib
+  - pillow
 prefix: C:\Users\Shay\anaconda3\envs\date_classification(1)
