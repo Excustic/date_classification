@@ -2,7 +2,6 @@ import datetime
 import multiprocessing
 from os.path import join
 import sys
-
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dropout, Flatten, Dense
@@ -145,7 +144,7 @@ def plot_progress(history):
 
 
 def predict(model, image):
-    p = model.score(image, )
+    p = model.model_score(image, )
     print(p)
 
 train_generator, validation_generator = import_data()

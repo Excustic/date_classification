@@ -4,7 +4,6 @@ import pickle
 import sys
 import datetime
 from os.path import join
-
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -204,7 +203,7 @@ def test_log(model):
     for i in range(test_generator.samples):
         x, y = test_generator._get_batches_of_transformed_samples([i])
         filepath = test_generator.filepaths[i]
-        p = model.score(x, ).tolist()[0]
+        p = model.model_score(x, ).tolist()[0]
         PR[int(y[0])].append(int(y[0]) == p.index(max(p)))
         print("pred - ", train_labels[p.index(max(p))], " | real - ", train_labels[int(y[0])], "| conf - ", max(p),
               "| f:", filepath)
