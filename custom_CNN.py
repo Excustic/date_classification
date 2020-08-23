@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+__author__ = "Michael Kushnir"
+__copyright__ = "Copyright 2020, Efcom Solutions ltd."
+__credits__ = ["Michael Kushnir"]
+__license__ = "GPL"
+__version__ = "1.0.0"
+__maintainer__ = "Michael Kushnir"
+__email__ = "michaelkushnir123233@gmail.com"
+__status__ = "prototype"
+
 import json
 import multiprocessing
 import pickle
@@ -7,35 +17,47 @@ from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+import tensorflow as tf
 from tensorflow.keras import backend as K, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
-# import splitfolders as sf   - a good library for splitting dataset to train/val/test
+import splitfolders as sf   # - a good library for splitting dataset to train/val/test
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from time import time
 
 labels = []
 features = []
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'split\\train'
-valid_path = 'split\\val'
-test_path = 'split\\test'
+train_path = 'split2\\train'
+valid_path = 'split2\\val'
+test_path = 'split2\\test'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
 home = sys.path[0]
 epochs = 100
 sessions = 1
-model_name = 'CNN_model.h5'
-history_name = 'CNN_history'
-batch_size = 64
-loaded_model = load_model(join(home, save_path, model_name))
-loaded_model.load_weights(join(save_path, 'weights_best.hdf5'))
+model_name = 'CNN_model2.h5'
+history_name = 'CNN_history2'
+weights_path = "weights_best2.hdf5"
+batch_size = 32     # larger size might not work on some machines
+# loaded_model = load_model(join(home, save_path, model_name))
+# loaded_model.load_weights(join(save_path, 'weights_best2.hdf5'))
+# configurations for the usage gpu_tensorflow
+config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 def import_data():
+    """
+    In this module we use a technique of Image Augmentation called Image Data Generators,
+    this function configures them
+    """
     # this is the augmentation configuration we will use for training
     # you can tinker with values to avoid over-fitting or under-fitting; I found these values to do well
     datagen = ImageDataGenerator(
@@ -53,7 +75,7 @@ def import_data():
         target_size=fixed_size,  # all images will be resized to fixed_size
         batch_size=batch_size,
         class_mode='sparse',
-    )  # since we use categorical_crossentropy loss, we need categorical labels
+    )  # since we use sparse_categorical_crossentropy loss, we need sparse labels
 
     # this is a similar generator, for validation data
     validation_generator = val_datagen.flow_from_directory(
@@ -67,11 +89,17 @@ def import_data():
 
 
 def train_model(train_generator, validation_generator):
+    """
+    Trains the model, requires train/val generators.
+    A model with best accuracy will be stored as a file separately in the saved_files folder
+    """
     # what is the image data format convention
     if K.image_data_format() == "channels_first":
         input_shape = (3, fixed_size[0], fixed_size[1])
     else:
         input_shape = (fixed_size[0], fixed_size[1], 3)
+
+    # we build a test generator to benchmark the model on unseen data
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     test_generator = test_datagen.flow_from_directory(
@@ -99,16 +127,15 @@ def train_model(train_generator, validation_generator):
     model.add(Dropout(0.5))
     model.add(Dense(3, activation='softmax'))
     # compile model
-    opt = Adam(learning_rate=.0008)
+    opt = Adam(learning_rate=.0004)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    filepath = "weights_best.hdf5"
-    checkpoint = ModelCheckpoint(join(save_path, filepath), monitor='val_accuracy', save_best_only=True, mode='max')
+    checkpoint = ModelCheckpoint(join(save_path, weights_path), monitor='val_accuracy', save_best_only=True, mode='max')
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=epochs // 5, verbose=1,
                                    restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
-    # origin [sessions] models each [epochs] times
+    # train [sessions] models, each [epochs] times
     max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation
@@ -120,7 +147,7 @@ def train_model(train_generator, validation_generator):
             validation_steps=validation_generator.samples // batch_size
             , verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
             use_multiprocessing=False)
-        model.load_weights(join(save_path, filepath))
+        model.load_weights(join(save_path, weights_path))
         test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
         # save model if it performed better
         if test_acc > max_acc:
@@ -132,6 +159,10 @@ def train_model(train_generator, validation_generator):
 
 
 def plot_progress(history):
+    """
+    ***DEPRECATED - Tensorboard is a better implementation***
+    Uses history file of model to plot metrics
+    """
     acc = history['accuracy']
     val_acc = history['val_accuracy']
 
@@ -156,8 +187,13 @@ def plot_progress(history):
 
 
 def calc_activations(model, index):
+    """
+    Calculates activations for a single image and outputs the calculations and the filename of the image
+    Used for display_activation
+    """
     layer_outputs = [layer.output for layer in model.layers]
     activation_model = Model(inputs=model.input, outputs=layer_outputs)
+    # Import a single image
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     test_generator = test_datagen.flow_from_directory(
@@ -167,7 +203,7 @@ def calc_activations(model, index):
         shuffle=True,
         class_mode='sparse',
         batch_size=1)
-
+    # get image from generator using index - we use index to retrieve the filename
     x, _ = test_generator._get_batches_of_transformed_samples([index])
     filename = test_generator.filenames[index]
     activations = activation_model.predict(x)
@@ -176,6 +212,11 @@ def calc_activations(model, index):
 
 
 def display_activation(model, activations, name, col_size, row_size, act_index):
+    """
+    Plots activations of an image fed to the model
+    Useful for visualizing features the model is picking
+    Used for visualize
+    """
     activation = activations[act_index]
     activation_index = 0
     fig, ax = plt.subplots(row_size, col_size, figsize=(row_size * 2.5, col_size * 1.5))
@@ -189,6 +230,10 @@ def display_activation(model, activations, name, col_size, row_size, act_index):
 
 
 def test_log(model):
+    """
+    A verbose log of test evaluation of the model
+    """
+    # Import the test data
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     test_generator = test_datagen.flow_from_directory(
@@ -198,14 +243,16 @@ def test_log(model):
         shuffle=True,
         class_mode='sparse',
         batch_size=1)
+    # Get the simple test
     print(model.evaluate(test_generator, steps=len(test_generator)))
+    # Detailed test
     PR = ([], [], [])
     for i in range(test_generator.samples):
         x, y = test_generator._get_batches_of_transformed_samples([i])
         filepath = test_generator.filepaths[i]
-        p = model.model_score(x, ).tolist()[0]
+        p = model.predict(x, ).tolist()[0]
         PR[int(y[0])].append(int(y[0]) == p.index(max(p)))
-        print("pred - ", train_labels[p.index(max(p))], " | real - ", train_labels[int(y[0])], "| conf - ", max(p),
+        print("prediction - ", train_labels[p.index(max(p))], " | real - ", train_labels[int(y[0])], "| confidence - ", max(p),
               "| f:", filepath)
     for i in range(3):
         print(train_labels[i], ": ", PR[i].count(True), "/", len(PR[i]), "correct - ",
@@ -214,6 +261,11 @@ def test_log(model):
 
 
 def visualize(model):
+    """
+    An interactive function which plots the features that layers of the model picked up
+    To use, simply press enter to get a new image; enter a number from 0-6 to see what layer at that index is picking up
+    enter -1 to advance to another image, finally press q after -1 to exit
+    """
     index = 0
     while str(input()) != 'q':
         activations, name = calc_activations(model, index)
@@ -226,24 +278,92 @@ def visualize(model):
             layer_num = int(input())
         index += 1
 
+
 def score(filepath, filename):
+    """
+    ***DEPRECATED - The function was implemented in app.py, since this module won't be uploaded to docker***
+    Imports a pre-trained model, feeds (filepath/filename) to the neural network and predicts class with confidence
+    """
+    # Pillow is used since we open a new file that wasn't in our test folder
     img = Image.open(join(filepath, filename))
     img = img.resize(fixed_size)
     img = np.array(img)
     img = img / 255.0
     img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
+    K.set_learning_phase(0)
     p = loaded_model.predict(img).tolist()[0]
+    print(p)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     with open(join(filepath, 'result.json'), 'w') as f:
         json.dump(result, f)
     return result
 
-     # train_gen, val_gen = import_data()
+# filepath = "C:\\Users\\Shay\\PycharmProjects\\date_classification\\split\\test\\PR_Waste_Model\\"
+# filename = "Waste_381_.jpg"
+# train_gen, val_gen = import_data()
 # train_model(train_gen, val_gen)
 # model = load_model(join(home, save_path, model_name))
-# model.load_weights(join(save_path, 'weights_best.hdf5'))
-# model.save(join(home, save_path, model_name))
-# visualize()
-# model
+# model.load_weights(join(save_path, weights_path))
+# test_log(model)
+# visualize(model)
 # history = pickle.load(open(join(home, save_path, history_name), "rb"))
 # plot_progress(history)
+
+# TODO: create a fast_predict.py
+class LiteModel:
+
+    @classmethod
+    def from_file(cls, model_path):
+        return LiteModel(tf.lite.Interpreter(model_path=model_path))
+
+    @classmethod
+    def from_keras_model(cls, kmodel):
+        converter = tf.lite.TFLiteConverter.from_keras_model(kmodel)
+        tflite_model = converter.convert()
+        return LiteModel(tf.lite.Interpreter(model_content=tflite_model))
+
+    def __init__(self, interpreter):
+        self.interpreter = interpreter
+        self.interpreter.allocate_tensors()
+        input_det = self.interpreter.get_input_details()[0]
+        output_det = self.interpreter.get_output_details()[0]
+        self.input_index = input_det["index"]
+        self.output_index = output_det["index"]
+        self.input_shape = input_det["shape"]
+        self.output_shape = output_det["shape"]
+        self.input_dtype = input_det["dtype"]
+        self.output_dtype = output_det["dtype"]
+
+    def predict(self, inp):
+        inp = inp.astype(self.input_dtype)
+        count = inp.shape[0]
+        out = np.zeros((count, self.output_shape[1]), dtype=self.output_dtype)
+        for i in range(count):
+            self.interpreter.set_tensor(self.input_index, inp[i:i+1])
+            self.interpreter.invoke()
+            out[i] = self.interpreter.get_tensor(self.output_index)[0]
+        return out
+
+    def predict_single(self, inp):
+        """ Like predict(), but only for a single record. The input data can be a Python list. """
+        inp = np.array(inp, dtype=self.input_dtype)
+        self.interpreter.set_tensor(self.input_index, inp)
+        self.interpreter.invoke()
+        out = self.interpreter.get_tensor(self.output_index)
+        return out[0]
+
+
+# score(filepath, filename)
+# lite_model = LiteModel.from_keras_model(model)
+# img = Image.open(join(filepath, filename))
+# img = img.resize(fixed_size)
+# img = np.array(img)
+# img = img / 255.0
+# img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
+# t0 = time()
+# print(lite_model.predict_single(img))
+# print("%.4f sec" % (time() - t0))
+# while str(input()) != 'q':
+#     t0 = time()
+#     print(lite_model.predict_single(img))
+#     print("%.4f sec" % (time() - t0))

@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+__author__ = "Michael Kushnir"
+__copyright__ = "Copyright 2020, Efcom Solutions ltd."
+__credits__ = ["Michael Kushnir"]
+__license__ = "GPL"
+__version__ = "1.0.0"
+__maintainer__ = "Michael Kushnir"
+__email__ = "michaelkushnir123233@gmail.com"
+__status__ = "prototype"
+
 import datetime
 import multiprocessing
 from os.path import join
@@ -12,13 +22,14 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.applications import VGG16
+from date_classification import import_data, plot_progress
 
 labels = []
 features = []
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'split\\train'
-valid_path = 'split\\val'
-test_path = 'split\\test'
+train_path = 'split2\\train'
+valid_path = 'split2\\val'
+test_path = 'split2\\test'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
 bins = 8
@@ -35,40 +46,13 @@ config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(session)
 
-def import_data():
-
-    # this is the augmentation configuration we will use for training
-    # you can tinker with values to avoid over-fitting or under-fitting; I found these values to do well
-    datagen = ImageDataGenerator(
-        rescale=1. / 255,  # rescale pixel values from 0-255 to 0-1 so the data would be normalized
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        )
-    val_datagen = ImageDataGenerator(rescale=1. / 255)
-
-    # this is a generator that will read pictures found in
-    # sub-folders and indefinitely generate batches of augmented image data
-    train_generator = datagen.flow_from_directory(
-        join(home, train_path),  # this is the target directory
-        target_size=fixed_size,  # all images will be resized to fixed_size
-        batch_size=batch_size,
-        class_mode='sparse',
-        )  # since we use categorical_crossentropy loss, we need categorical labels
-
-    # this is a similar generator, for validation data
-    validation_generator = val_datagen.flow_from_directory(
-        join(home, valid_path),
-        target_size=fixed_size,
-        batch_size=batch_size,
-        class_mode='sparse',
-        )
-
-    return train_generator, validation_generator
-
-
 
 def build_model():
+    """
+    This module uses the notion of Transfer-Learning
+    I found VGG16 model to perform the best and nearly as good as mine
+    This function configures our model, freezes the VGG 16 and adds a small module on top of it
+    """
     pretrained_model = VGG16(input_shape=(fixed_size[0], fixed_size[1], 3), weights='imagenet', include_top=False)
     # We will not train the layers imported.
     for layer in pretrained_model.layers:
@@ -86,6 +70,11 @@ def build_model():
 
 
 def train_model(train_generator, validation_generator):
+    """
+    Trains the model, requires train/val generators.
+    A model with best accuracy will be stored as a file separately in the saved_files folder
+    """
+    # we build a test generator to benchmark the model on unseen data
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     test_generator = test_datagen.flow_from_directory(
@@ -96,8 +85,7 @@ def train_model(train_generator, validation_generator):
         class_mode='sparse',
         batch_size=batch_size)
     model = build_model()
-    # checkpoint
-    filepath = join(save_path, "weights_best_smart.hdf5")
+    filepath = join(save_path, "weights_best_smart2.hdf5")
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=6, verbose=1, restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit_smart', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -119,33 +107,11 @@ def train_model(train_generator, validation_generator):
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
         K.clear_session()
 
-def plot_progress(history):
-    acc = history['accuracy']
-    val_acc = history['val_accuracy']
-
-    loss = history['loss']
-    val_loss = history['val_loss']
-
-    epochs_range = range(epochs)
-
-    plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-    plt.legend(loc='lower right')
-    plt.title('Training and Validation Accuracy')
-
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
-    plt.show()
-
-
+# TODO: edit and a JSON too
 def predict(model, image):
-    p = model.model_score(image, )
+    p = model.model_score(image)
     print(p)
+
 
 train_generator, validation_generator = import_data()
 train_model(train_generator, validation_generator)
