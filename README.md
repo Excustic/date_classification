@@ -1,24 +1,30 @@
-# Date Classification
+# Date Classification - Full Guide
 
-An Azure machine learning web app which will classify an image of a date into one of the following categories:
+This is a documentation and tutorial for creating an Azure machine learning web app which will classify an image of a date into one of the following categories:
 
-1. PR_Class_Model
+1. PR_Class_Model 
 2. PR_Skin_Model
 3. PR_Waste_Model
+## Table of Contents
+* [Configuration](#config)
+  * [Dependencies & Requirements](#d&r)
+  * [Import and split your data](#import-split)
+* [Training Models](#train-main)
+  * [Train a custom Convolutional Neural Network](#train-custom)
+  * [Train a pre-trained Convolutional Neural Network (Transfer Learning)](#train-transfer)
+## <a name="config"></a>Configuration
 
-## Configuration
+- Download the environment that is used in this project, [Anaconda](https://www.anaconda.com/products/individual) - a great environment and dependencies manager for data science tools.
+- Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest), create an Azure account and use it to create a resource group, container registry and web app.
+- Install [Docker](https://www.docker.com/products/docker-desktop) (This will be used to upload our app to cloud).
+- **Optional (for Nvidia GPU enabled devices)** - [CUDA 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base) and [CUDNN 7.6.5 for CUDA 10.1](https://developer.nvidia.com/rdp/cudnn-archive#a-collapse765-101) (Do not install newer version as tensorflow supports only version 10.1 and below as of 8/23/2020)
 
-- Download the environment that is used in this project, [Anaconda](https://www.anaconda.com/products/individual), a great environment and dependencies manager for data science tools.
-- Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest), create Azure account, create a resource group, container registry and web app.
-- Install Docker (This will be used to upload our app to cloud)
-- **Optional (for Nvidia GPU devices)** - [CUDA 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base) and [CUDNN 7.6.5 for CUDA 10.1](https://developer.nvidia.com/rdp/cudnn-archive#a-collapse765-101) (Do not install newer version as tensorflow supports only version 10.1 and below as of 8/23/2020)
-
-**Note** - It is highly recommended to install all of your dependencies with Anaconda via `conda install` command to avoid conflicts. Using conda-forge channel is also recommended, to add it type in the terminal
+**Note** - It is highly recommended to install all of your dependencies with Anaconda via `conda install` command to avoid conflicts. Using conda-forge channel is also recommended. To add it, type in the terminal:
 ```
 conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
-### Dependencies
+### <a name="d&r"></a>Dependencies & Requirements
   - python=3.7
   - tensorflow-gpu
   
@@ -30,7 +36,7 @@ conda config --set channel_priority strict
   - numpy
   - split-folders (optional)
 
-### Import and splitting data
+### <a name="import-split"></a>Import and split your data
 While not necessary, I recommend using pip library split-folders.
 To install, simply type this command in terminal: `pip install split-folders`
 The process is very simple and requires only two lines of code
@@ -38,10 +44,37 @@ The process is very simple and requires only two lines of code
 import splitfolders as sf
 sf.ratio(in_path, out_path, seed=1337, ratio=(.7, .2, .1))
 ```
-This will basically take all of the subfolders from `in_path` and will split the data to a new folder that is located in `out_path` with the ratio of (train-70%, validation-20%, test-10%)
-## Training models
+This will basically take all of the subfolders from `in_path` and will split the data to a new folder that is located in `out_path` with the ratio of (train-70%, validation-20%, test-10%).
+## <a name="train-main"></a>Training models
 This reopository includes two unique methods of training
-## Building a custom Convolutional Neural Network
-To build a custom CNN, open custom_CNN.py
+### <a name="train-custom"></a>Training a custom Convolutional Neural Network
+To build a custom CNN, you will be using `custom_CNN.py` module in the project.
 
---- TO BE CONTINUED
+The main functions that you will have to use are: import_data(), train_model(), score().
+If you have some knowledge or want to experiment with the models you can easily change parameters of your model in train_model().
+I would suggest tinkering with `learning_rate` of the optimizer, `filter_size` and `batch_size` or even changing the structure of the CNN.
+
+After you're done with setting up the model to your liking, create a folder under the project's directory with `save_path`'s value as the name.
+**Note** - Remember to change values of train/val/test paths according to the folder name where you will be importing data from (`out_path` if you've used the splitfolders method )
+
+And now it's showtime! To build and train your model type in:
+```
+train_gen, val_gen = import_data()
+train_model(train_gen, val_gen)
+```
+Later on you can use it again and even classify new data using the following method:
+```
+model = load_model(join(home, save_path, model_name))
+model.load_weights(join(save_path, weights_path))
+result = score(filepath, filename)
+```
+This code will load your trained model and the weights that performed the best during training - It's a good habit to save and load your models, just to make sure they are not corrupted and moreover, you don't want to train a new model everytime when you will be deploying your app to the web, it will be computationally expensive and time wasting.
+
+The model will classify the new image and will return a JSON object. Here's an example: `{"confidence":0.9818311333656311,"label":"PR_Class_Model"}`
+
+If you want to get even deeper, and analyze your models, feel free to check the other functions that are in this module. **Note** - You can see a graph of your model's performance using [Tensorboard - Tensorflow's visualization toolkit](https://www.tensorflow.org/tensorboard/). You can run Tensorboard terminal by typing `tensorboard --logdir yourpath/to/logs`. I suggest creating a logging dir under `save_path` folder.
+### <a name="train-transfer"></a>Training a pre-trained Convolutional Neural Network (Transfer Learning)
+To use a predefined model that was trained on a large dataset beforehand, you will be using `transfer_learning.py` for this task.
+This module works very similarly to `custom_CNN.py`, so you can follow the same steps in the previous paragraph.
+Although the workflow is pretty much the same, you can see some interesting differences between the two methods.
+I found out that the current method will provide better accuracy from the beginning (usually 70%) and will continue to slowly rise until a point where the custom model actually performs better. If you want to use this project for other purposes, like classifying cats, this method might be actually better because there is a large amount of cat samples that the predefined model was trained on. Since this project has a more specific purpose, transfer learning isn't really useful in this case.
