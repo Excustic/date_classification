@@ -8,29 +8,25 @@ __maintainer__ = "Michael Kushnir"
 __email__ = "michaelkushnir123233@gmail.com"
 __status__ = "prototype"
 
-import json
+import datetime
+import glob
 import os
 import random
 import string
-import sys
+from os import listdir
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-import numpy as np
-from PIL import Image
 from flask import Flask, request, flash, render_template
 from os.path import join
 from werkzeug.utils import redirect, secure_filename
+from custom_CNN import save_path, home
+from fast_predict import create_lite, fast_predict
 
-home = sys.path[0]
 app = Flask(__name__)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 app.config['UPLOAD_IMAGES'] = join(home, 'saved_files', 'predict')
 app.config['UPLOAD_MODELS'] = join(home, 'saved_files', 'models')
-RESTAPI_URL = "https://xxxxx.com"
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-save_path = 'saved_files'
-train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-fixed_size = tuple((200, 200))
+ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
 model_name = 'CNN_model.h5'
 
 
@@ -38,30 +34,18 @@ def load_model_config():
     """
     Loads newest model or the default
     """
-    if os.path.isdir(app.config['UPLOAD_MODELS']):
-        latest_folder = sorted(os.listdir(app.config['UPLOAD_MODELS']), key=os.path.getmtime)[-1]
-        with load_model(join(app.config['UPLOAD_MODELS'], latest_folder, 'model')) as model:
-            model.load_weights(join(app.config['UPLOAD_MODELS'], latest_folder, 'weights'))
-            return model
     model = load_model(join(home, save_path, model_name))
     model.load_weights(join(save_path, 'weights_best.hdf5'))
+    if os.path.isdir(app.config['UPLOAD_MODELS']):
+        latest_folder = max(glob.glob(join(app.config['UPLOAD_MODELS'], '*')), key=os.path.getctime)
+        try:
+            model = load_model(join(app.config['UPLOAD_MODELS'], latest_folder, 'model'
+                                    , os.listdir(join(app.config['UPLOAD_MODELS'], latest_folder, 'model'))[0]))
+            model.load_weights(join(app.config['UPLOAD_MODELS'], latest_folder, 'weights', listdir(join(app.config['UPLOAD_MODELS'], latest_folder, 'weights'))[0]))
+            return model
+        except Exception as e:
+            print(e)
     return model
-
-
-def model_score(filepath, filename):
-    """
-    Imports a pre-trained model, feeds (filepath/filename) to the neural network and predicts class with confidence
-    """
-    img = Image.open(join(filepath, filename))
-    img = img.resize(fixed_size)
-    img = np.array(img)
-    img = img / 255.0
-    img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
-    p = loaded_model.predict(img).tolist()[0]
-    result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
-    with open(join(filepath, 'result.json'), 'w') as f:
-        json.dump(result, f)
-    return result
 
 
 def allowed_file(filename, mode=0):
@@ -70,7 +54,8 @@ def allowed_file(filename, mode=0):
     """
     # mode 0 - picture upload, mode 1 - model and weights upload
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS[0:len(ALLOWED_EXTENSIONS) - mode]
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS[(len(ALLOWED_EXTENSIONS) - 2) * mode:(len(
+        ALLOWED_EXTENSIONS) - 2) + mode * 2]
 
 
 @app.route('/store', methods=['GET', 'POST'])
@@ -88,22 +73,25 @@ def store_model():
         if model.filename == '' or weights.filename == '':
             flash('No selected file')
             return redirect(request.url)
-        if model and weights and allowed_file(model.filename, mode=1) and allowed_file(weights.filename, mode=1):
-            model_filename = secure_filename(file.filename)
-            weights_filename = secure_filename(file.filename)
-            filepath = join(app.config['UPLOAD_MODELS'], filename.split('.')[0]
-                            , datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-            try:
-                if not os.path.isdir(app.config['UPLOAD_MODELS']):
-                    os.mkdir(app.config['UPLOAD_MODELS'])
-                os.mkdir(filepath)
-                os.mkdir(join(filepath, 'model'))
-                os.mkdir(join(filepath, 'weights'))
-                model.save(join(filepath, 'model', model_filename))
-                weights.save(join(filepath, 'weights', weights_filename))
-            except Exception as e:
-                print(e)
-                return "Encountered Error"
+        if not model or not weights or not allowed_file(model.filename, mode=1) or not allowed_file(weights.filename,
+                                                                                                    mode=1):
+            flash('Invalid file')
+            return redirect(request.url)
+        model_filename = secure_filename(model.filename)
+        weights_filename = secure_filename(weights.filename)
+        filepath = join(app.config['UPLOAD_MODELS'], model_filename.split('.')[0]
+                        + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        try:
+            if not os.path.isdir(app.config['UPLOAD_MODELS']):
+                os.mkdir(app.config['UPLOAD_MODELS'])
+            os.mkdir(filepath)
+            os.mkdir(join(filepath, 'model'))
+            os.mkdir(join(filepath, 'weights'))
+            model.save(join(filepath, 'model', model_filename))
+            weights.save(join(filepath, 'weights', weights_filename))
+        except Exception as e:
+            print(e)
+            return "Encountered Error"
         return "Uploaded Successfully"
     return render_template("store.html")
 
@@ -140,7 +128,8 @@ def score():
                     filepath = filepath + rand_str
                 os.mkdir(filepath)
                 file.save(join(filepath, filename))
-                res_json = model_score(filepath, filename)
+                # fast_predict is a fast implementation of the basic predict method
+                res_json = fast_predict(filepath, filename)
             except Exception as e:
                 print(e)
         return res_json
@@ -149,9 +138,10 @@ def score():
 
 if __name__ == '__main__':
     loaded_model = load_model_config()
+    create_lite(loaded_model)
     # configurations for the usage gpu_tensorflow
     config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
     config.gpu_options.allow_growth = True
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -12,32 +12,30 @@ import datetime
 import multiprocessing
 from os.path import join
 import sys
+import numpy as np
+from PIL import Image
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
-# import splitfolders as sf   - a good library for splitting dataset to train/val/test
+import splitfolders as sf   # a good library for splitting dataset to train/val/test
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.applications import VGG16
-from date_classification import import_data, plot_progress
 
-labels = []
-features = []
+
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
 train_path = 'split2\\train'
 valid_path = 'split2\\val'
 test_path = 'split2\\test'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
-bins = 8
 home = sys.path[0]
 epochs = 100
 sessions = 1
-model_name = 'InceptionV3_model.h5'
-history_name = 'InceptionV3_history'
+model_name = 'VGG16_model.h5'
+history_name = 'VGG16_history'
 batch_size = 32
 
 # configurations for the usage gpu_tensorflow
@@ -99,23 +97,27 @@ def train_model(train_generator, validation_generator):
             steps_per_epoch=train_generator.samples // batch_size,
             epochs=epochs,
             validation_data=validation_generator,
-            validation_steps=validation_generator.samples // batch_size
-            , verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
+            validation_steps=validation_generator.samples // batch_size,
+            verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
             use_multiprocessing=False)
         model.load_weights(join(filepath))
         test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
         K.clear_session()
 
-# TODO: edit and a JSON too
-def predict(model, image):
-    p = model.model_score(image)
+
+def score(filepath, filename, model):
+    """
+    Imports a pre-trained model, feeds (filepath/filename) to the neural network and predicts class with confidence
+    """
+    # Pillow library is used since we open a new file that wasn't in our test folder
+    img = Image.open(join(filepath, filename))
+    img = img.resize(fixed_size)
+    img = np.array(img)
+    img = img / 255.0
+    img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
+    p = model.predict(img).tolist()[0]
     print(p)
+    result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
+    return result
 
-
-train_generator, validation_generator = import_data()
-train_model(train_generator, validation_generator)
-# model = load_model(join(home, save_path, model_name))
-# history = pickle.load(open(join(home, save_path, history_name), "rb"))
-# plot_progress(history)
-# print(model.evaluate_generator(validation_generator, 250))

@@ -8,7 +8,6 @@ __maintainer__ = "Michael Kushnir"
 __email__ = "michaelkushnir123233@gmail.com"
 __status__ = "prototype"
 
-import json
 import multiprocessing
 import pickle
 import sys
@@ -20,38 +19,33 @@ from PIL import Image
 import tensorflow as tf
 from tensorflow.keras import backend as K, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
-from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
-import splitfolders as sf   # - a good library for splitting dataset to train/val/test
+import splitfolders as sf   # a good library for splitting dataset to train/val/test
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from time import time
 
-labels = []
-features = []
+
 train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
 train_path = 'split2\\train'
 valid_path = 'split2\\val'
 test_path = 'split2\\test'
 save_path = 'saved_files'
 fixed_size = tuple((200, 200))
-bins = 8
 home = sys.path[0]
 epochs = 100
 sessions = 1
 model_name = 'CNN_model2.h5'
 history_name = 'CNN_history2'
 weights_path = "weights_best2.hdf5"
-batch_size = 32     # larger size might not work on some machines
-# loaded_model = load_model(join(home, save_path, model_name))
-# loaded_model.load_weights(join(save_path, 'weights_best2.hdf5'))
+batch_size = 64     # larger size might not work on some machines
 # configurations for the usage gpu_tensorflow
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
 config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(session)
+
 
 def import_data():
     """
@@ -127,7 +121,7 @@ def train_model(train_generator, validation_generator):
     model.add(Dropout(0.5))
     model.add(Dense(3, activation='softmax'))
     # compile model
-    opt = Adam(learning_rate=.0004)
+    opt = Adam(learning_rate=.0004 * (batch_size // 32))
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     checkpoint = ModelCheckpoint(join(save_path, weights_path), monitor='val_accuracy', save_best_only=True, mode='max')
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=epochs // 5, verbose=1,
@@ -264,13 +258,22 @@ def visualize(model):
     """
     An interactive function which plots the features that layers of the model picked up
     To use, simply press enter to get a new image; enter a number from 0-6 to see what layer at that index is picking up
-    enter -1 to advance to another image, finally press q after -1 to exit
+    enter -1 to advance to another image, finally press q after -1 to exit. enter -2 to see another class
     """
     index = 0
+    current_label = train_labels[0]
     while str(input()) != 'q':
         activations, name = calc_activations(model, index)
         layer_num = int(input())
         while layer_num != -1:
+            if layer_num == -2:
+                tmp = current_label
+                while current_label != train_labels[train_labels.index(tmp)+1]:
+                    index += 20
+                    _, name = calc_activations(model, index)
+                    if name.split('\\')[0] == train_labels[train_labels.index(current_label)+1]:
+                        current_label = train_labels[train_labels.index(current_label) + 1]
+                break
             try:
                 display_activation(model, activations, name, 8, 4, layer_num)
             except Exception as e:
@@ -279,91 +282,17 @@ def visualize(model):
         index += 1
 
 
-def score(filepath, filename):
+def score(filepath, filename, model):
     """
-    ***DEPRECATED - The function was implemented in app.py, since this module won't be uploaded to docker***
     Imports a pre-trained model, feeds (filepath/filename) to the neural network and predicts class with confidence
     """
-    # Pillow is used since we open a new file that wasn't in our test folder
+    # Pillow library is used since we open a new file that wasn't in our test folder
     img = Image.open(join(filepath, filename))
     img = img.resize(fixed_size)
     img = np.array(img)
     img = img / 255.0
     img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
-    K.set_learning_phase(0)
-    p = loaded_model.predict(img).tolist()[0]
+    p = model.predict(img).tolist()[0]
     print(p)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
-    with open(join(filepath, 'result.json'), 'w') as f:
-        json.dump(result, f)
     return result
-
-# filepath = "C:\\Users\\Shay\\PycharmProjects\\date_classification\\split\\test\\PR_Waste_Model\\"
-# filename = "Waste_381_.jpg"
-# train_gen, val_gen = import_data()
-# train_model(train_gen, val_gen)
-# model = load_model(join(home, save_path, model_name))
-# model.load_weights(join(save_path, weights_path))
-# test_log(model)
-# visualize(model)
-# history = pickle.load(open(join(home, save_path, history_name), "rb"))
-# plot_progress(history)
-
-# TODO: create a fast_predict.py
-class LiteModel:
-
-    @classmethod
-    def from_file(cls, model_path):
-        return LiteModel(tf.lite.Interpreter(model_path=model_path))
-
-    @classmethod
-    def from_keras_model(cls, kmodel):
-        converter = tf.lite.TFLiteConverter.from_keras_model(kmodel)
-        tflite_model = converter.convert()
-        return LiteModel(tf.lite.Interpreter(model_content=tflite_model))
-
-    def __init__(self, interpreter):
-        self.interpreter = interpreter
-        self.interpreter.allocate_tensors()
-        input_det = self.interpreter.get_input_details()[0]
-        output_det = self.interpreter.get_output_details()[0]
-        self.input_index = input_det["index"]
-        self.output_index = output_det["index"]
-        self.input_shape = input_det["shape"]
-        self.output_shape = output_det["shape"]
-        self.input_dtype = input_det["dtype"]
-        self.output_dtype = output_det["dtype"]
-
-    def predict(self, inp):
-        inp = inp.astype(self.input_dtype)
-        count = inp.shape[0]
-        out = np.zeros((count, self.output_shape[1]), dtype=self.output_dtype)
-        for i in range(count):
-            self.interpreter.set_tensor(self.input_index, inp[i:i+1])
-            self.interpreter.invoke()
-            out[i] = self.interpreter.get_tensor(self.output_index)[0]
-        return out
-
-    def predict_single(self, inp):
-        """ Like predict(), but only for a single record. The input data can be a Python list. """
-        inp = np.array(inp, dtype=self.input_dtype)
-        self.interpreter.set_tensor(self.input_index, inp)
-        self.interpreter.invoke()
-        out = self.interpreter.get_tensor(self.output_index)
-        return out[0]
-
-
-# score(filepath, filename)
-# lite_model = LiteModel.from_keras_model(model)
-# img = Image.open(join(filepath, filename))
-# img = img.resize(fixed_size)
-# img = np.array(img)
-# img = img / 255.0
-# img = img.reshape(1, fixed_size[0], fixed_size[1], 3)
-# t0 = time()
-# print(lite_model.predict_single(img))
-# print("%.4f sec" % (time() - t0))
-# while str(input()) != 'q':
-#     t0 = time()
-#     print(lite_model.predict_single(img))
-#     print("%.4f sec" % (time() - t0))

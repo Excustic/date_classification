@@ -4,13 +4,31 @@
     <meta charset="UTF-8">
     <title>Date Classification</title>
     <h1>Upload your model and weights (.h5 extensions only)</h1>
-    <form method=post enctype=multipart/form-data>
-        <label for="model">Import Model</label>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p>{{msg}}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+ <style>
+     div{
+        padding: 10px;
+     }
+ </style>
+</head>
+<body>
+   <form method=post enctype=multipart/form-data>
+        <div>
+            <label for="model">Import Model</label>
       <input type=file name=model id=model>
-        <label for="weights">Import Weights</label>
+        </div>
+        <div>
+            <label for="weights">Import Weights</label>
       <input type=file name=weights id=weights>
+        </div>
+
       <input type=submit value=Upload>
     </form>
-</head>
-
+</body>
 </html>
