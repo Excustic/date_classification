@@ -74,7 +74,13 @@ The model will classify the new image and will return a JSON object. Here's an e
 
 If you want to get even deeper, and analyze your models, feel free to check the other functions that are in this module. **Note** - You can see a graph of your model's performance using [Tensorboard - Tensorflow's visualization toolkit](https://www.tensorflow.org/tensorboard/). You can run Tensorboard terminal by typing `tensorboard --logdir yourpath/to/logs`. I suggest creating a logging dir under `save_path` folder.
 ### <a name="train-transfer"></a>Training a pre-trained Convolutional Neural Network (Transfer Learning)
-To use a predefined model that was trained on a large dataset beforehand, you will be using `transfer_learning.py` for this task.
-This module works very similarly to `custom_CNN.py`, so you can follow the same steps in the previous paragraph.
+**To use a predefined model that was trained on a large dataset beforehand, you will be using `transfer_learning.py` for this task.
+This module works very similarly to `custom_CNN.py`, so you can follow the same steps in the previous paragraph.****
+
 Although the workflow is pretty much the same, you can see some interesting differences between the two methods.
-I found out that the current method will provide better accuracy from the beginning (usually 70%) and will continue to slowly rise until a point where the custom model actually performs better. If you want to use this project for other purposes, like classifying cats, this method might be actually better because there is a large amount of cat samples that the predefined model was trained on. Since this project has a more specific purpose, transfer learning isn't really useful in this case.
+Due to previously training on a large dataset, this model will get a much better headstart than the former model. In contrast, its improvement will decay faster until it reaches a point when the custom model actually performs better (My hypothesis is that the model can't improve too much since all of its pretrained parts are frozen, and the top layer is just insufficient to provide full adaptation to this problem; this is where fine-tuning can actually help). If you want to use this project for more general purposes, like classifying animals, I am sure this method might will provide better results than a custom model. Since this project has a more specific purpose, transfer learning doesn't work in our favour in this case.
+## <a name="flask"></a> Using the model in a flask app
+In this section we create a web app on a local machine and we begin automating the process and making a pipeline.
+The code for creating the app is provided in app.py. You are not required to do much, just choose the names for your upload folder and model names.
+
+--TO BE CONTINUED
