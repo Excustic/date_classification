@@ -107,32 +107,33 @@ def score():
         if 'file' not in request.files:
             flash('No file part')
             return redirect(request.url)
-        file = request.files['file']
-        # if user does not select file, browser also
-        # submit an empty part without filename
-        if file.filename == '':
-            flash('No selected file')
-            return redirect(request.url)
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = join(app.config['UPLOAD_IMAGES'], filename.split('.')[0])
-            try:
-                if not os.path.isdir(app.config['UPLOAD_IMAGES']):
-                    os.mkdir(app.config['UPLOAD_IMAGES'])
-                # check if there's an actual duplicate or just same name
-                if os.path.isdir(filepath):
-                    # make a new folder if there's a file with the same name
-                    rand_str = ''.join(random.choice(string.ascii_letters) for i in range(5))
-                    while os.path.isdir(filepath + rand_str):
+        files = request.files.getlist('file[]')
+        for file in files:
+            # if user does not select file, browser also
+            # submit an empty part without filename
+            if file.filename == '':
+                flash('No selected file')
+                return redirect(request.url)
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = join(app.config['UPLOAD_IMAGES'], filename.split('.')[0])
+                try:
+                    if not os.path.isdir(app.config['UPLOAD_IMAGES']):
+                        os.mkdir(app.config['UPLOAD_IMAGES'])
+                    # check if there's an actual duplicate or just same name
+                    if os.path.isdir(filepath):
+                        # make a new folder if there's a file with the same name
                         rand_str = ''.join(random.choice(string.ascii_letters) for i in range(5))
-                    filepath = filepath + rand_str
-                os.mkdir(filepath)
-                file.save(join(filepath, filename))
-                # fast_predict is a fast implementation of the basic predict method
-                res_json = fast_predict(filepath, filename)
-            except Exception as e:
-                print(e)
-        return res_json
+                        while os.path.isdir(filepath + rand_str):
+                            rand_str = ''.join(random.choice(string.ascii_letters) for i in range(5))
+                        filepath = filepath + rand_str
+                    os.mkdir(filepath)
+                    file.save(join(filepath, filename))
+                    # fast_predict is a fast implementation of the basic predict method
+                    res_json = fast_predict(filepath, filename)
+                except Exception as e:
+                    print(e)
+            return res_json
     return render_template("index.html")
 
 

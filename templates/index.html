@@ -1,9 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link href='https://fonts.googleapis.com/css?family=Didact Gothic' rel='stylesheet'>
+    <style>
+    h1 {text-align: center;
+    font-family:'Didact Gothic';
+    color: rgb(232, 232, 227)
+    }
+    html{
+        height:100%;
+    }
+    body {
+        height: 100%;
+        background-image: repeating-linear-gradient(to right top, #3d4551, #436278, #3c839b, #28a6b7, #1cc9c9);
+        margin: 0;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+	#selectedFiles img {
+		max-width: 125px;
+		max-height: 125px;
+		float: left;
+		margin-bottom:10px;
+	}
+	.hide_file {
+    position: absolute;
+    z-index: 1000;
+    opacity: 0;
+    cursor: pointer;
+    right: 0;
+    top: 0;
+    height: 100%;
+    font-size: 24px;
+    width: 100%;
+    }
+    .button{
+      padding:10px 20px;
+      background:#00ad2d;
+      margin-left: 43%;
+      margin-right:43%;
+      position:relative;
+      color:#fff;
+      border-radius:2px;
+      text-align:center;
+      float:center;
+      cursor:pointer;
+      font-family:sans-serif;
+    }
+    </style>
+</head>
+<body>
     <meta charset="UTF-8">
     <title>Date Classification</title>
-    <h1>Upload new File</h1>
+    <h1>Fruit Classification</h1>
      {% with messages = get_flashed_messages() %}
         {% if messages %}
             {% for msg in messages %}
@@ -11,11 +60,46 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-</head>
-<body>
-    <form method=post enctype=multipart/form-data>
-          <input type=file name=file>
-          <input type=submit value=Upload>
-    </form>
+    <form id="myForm" method="post" enctype="multipart/form-data">
+        <div class="button">
+            <span id="button-text">Upload Files</span> <input type="file" id="files" class="hide_file" name="file[]" multiple accept="image/*"><br/>
+        </div>
+        <div id="selectedFiles" style="padding: 20px; font-family:Didact gothic; color:white"></div>
+	</form>
+
+	<script>
+	var selDiv = "";
+
+	document.addEventListener("DOMContentLoaded", init, false);
+	function init() {
+		document.querySelector('#files').addEventListener('change', handleFileSelect, false);
+		selDiv = document.querySelector("#selectedFiles");
+	}
+
+	function handleFileSelect(e) {
+
+		if(!e.target.files || !window.FileReader) return;
+        document.get
+		selDiv.innerHTML = "";
+
+		var files = e.target.files;
+		var filesArr = Array.prototype.slice.call(files);
+		document.getElementById("button-text").textContent=filesArr.length + "  files";
+		filesArr.forEach(function(f) {
+			if(!f.type.match("image.*")) {
+				return;
+			}
+
+			var reader = new FileReader();
+			reader.onload = function (e) {
+				var html = "<div style=\"display:flex; border: 2px solid;min-width: 100%;\"><img src=\"" + e.target.result + "\"><div style=\" margin-left: 10px;\">" + f.name + "</div></div><br clear=\"left\"/>";
+				selDiv.innerHTML += html;
+			}
+			reader.readAsDataURL(f);
+
+		});
+		// document.getElementById("myForm").submit();
+	}
+	</script>
 </body>
 </html>
