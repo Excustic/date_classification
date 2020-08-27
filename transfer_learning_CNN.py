@@ -120,4 +120,3 @@ def score(filepath, filename, model):
     print(p)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     return result
-

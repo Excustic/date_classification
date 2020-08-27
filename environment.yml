@@ -1,11 +1,13 @@
 name: date_classification_docker
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - python=3.7
   - tensorflow-gpu
+  - matplotlib
+  - tensorflow-estimator==2.1.0
+  - pydot
+  - graphviz
   - flask
   - opencv
-  - matplotlib
-  - pillow
-prefix: C:\Users\Shay\anaconda3\envs\date_classification(1)
+prefix: C:/Users/User/Anaconda3/envs/tf_gpu

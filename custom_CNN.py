@@ -39,7 +39,7 @@ sessions = 1
 model_name = 'CNN_model2.h5'
 history_name = 'CNN_history2'
 weights_path = "weights_best2.hdf5"
-batch_size = 64     # larger size might not work on some machines
+batch_size = 32     # larger size might not work on some machines
 # configurations for the usage gpu_tensorflow
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
 config.gpu_options.allow_growth = True
