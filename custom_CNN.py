@@ -66,7 +66,7 @@ def import_data():
     # sub-folders and indefinitely generate batches of augmented image data
     train_generator = datagen.flow_from_directory(
         join(home, train_path),  # this is the target directory
-        target_size=fixed_size,  # all images will be resized to fixed_size
+        target_size=fixed_size,  # all Images will be resized to fixed_size
         batch_size=batch_size,
         class_mode='sparse',
     )  # since we use sparse_categorical_crossentropy loss, we need sparse labels

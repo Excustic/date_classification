@@ -1,11 +1,11 @@
-origin
+origin2/**
+origin/**
 saved_files/**
-date_classification.py
-smart_approach.py
-environment.yml
 Ready_For_Model_3Var/**
-!/saved_files/predict
+static/images/**
 !/saved_files/CNN_model.h5
 !/saved_files/weights_best.hdf5
 split/**
+split2/**
+assets/**
 .gitignore
