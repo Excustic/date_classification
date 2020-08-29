@@ -123,7 +123,7 @@
         {% for obj in gen %}
             {% do obj_list.append(obj) %}
             <div style="display: flex;border: 2px solid white;width: 50%;margin: auto;">
-                <img class="def" src="{{ url_for('static', filename='images/'+obj['filepath'].split('\\')[-1]) }}">
+                <img class="def" src="{{ url_for('static', filename='images/'+obj['filepath']) }}">
                 <div style="margin-left: 10px;">
                 <span class="title">{{ obj['filename'] }}</span>
                 <br>

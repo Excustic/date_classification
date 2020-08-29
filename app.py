@@ -16,6 +16,8 @@ import shutil
 import string
 import sys
 from os import listdir
+from pathlib import Path
+
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from flask import Flask, request, flash, render_template, Response, stream_with_context
@@ -27,7 +29,7 @@ app = Flask(__name__, static_url_path='/static')
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 save_path = 'saved_files'
 home = sys.path[0]
-app.config['UPLOAD_IMAGES'] = join(home, 'static', 'images')
+app.config['UPLOAD_IMAGES'] = join(Path.cwd(), 'static', 'images')
 app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
 app.jinja_env.add_extension('jinja2.ext.do')
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
@@ -134,7 +136,7 @@ def single_score(files):
             file.save(join(filepath, filename))
             # fast_predict is a fast implementation of the basic predict method
             res_json = fast_predict(filepath, filename)
-            final_path = filepath.split("\\")[-1] + '/' + filename
+            final_path = filepath.replace("\\","/").split('/')[-1] + '/' + filename
             filepath = final_path
             label = res_json["label"]
             confidence = res_json["confidence"]
@@ -181,4 +183,4 @@ if __name__ == '__main__':
     config.gpu_options.allow_growth = True
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
