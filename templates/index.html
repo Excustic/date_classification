@@ -138,6 +138,11 @@
     </div>
     <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
     <script type="text/javascript">
+        $('input#files').change(function(){
+        var files = $(this)[0].files;
+        console.log(files.length);
+        document.getElementById("button-text").textContent = "Selected " + files.length.toString() + " file(s)";
+        });
         {% set dict_count = {} %}
         {% if obj_list %}
             var div_stats = '<div>'

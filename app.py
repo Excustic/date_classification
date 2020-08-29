@@ -166,7 +166,6 @@ def score():
             if not allowed_file(file.filename):
                 flash('Invalid file type')
                 return render_template('index.html')
-        flash('Selected ' + str(len(files)) + ' file(s)')
         return Response(stream_with_context(stream_template("index.html", gen=single_score(files))))
     filepaths = {}
     labels = {}
