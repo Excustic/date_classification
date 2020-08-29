@@ -24,28 +24,15 @@ from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras.models import Sequential
 import splitfolders as sf   # a good library for splitting dataset to train/val/test
 from tensorflow.keras.optimizers import Adam
+from app import home, save_path
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
 
-
-train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'split2\\train'
-valid_path = 'split2\\val'
-test_path = 'split2\\test'
-save_path = 'saved_files'
-fixed_size = tuple((200, 200))
-home = sys.path[0]
-epochs = 100
-sessions = 1
-model_name = 'CNN_model2.h5'
-history_name = 'CNN_history2'
-weights_path = "weights_best2.hdf5"
-batch_size = 32     # larger size might not work on some machines
 # configurations for the usage gpu_tensorflow
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
 config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(session)
-
 
 def import_data():
     """
@@ -147,37 +134,7 @@ def train_model(train_generator, validation_generator):
         if test_acc > max_acc:
             max_acc = test_acc
             model.save(join(home, save_path, model_name))
-            with open(join(home, save_path, history_name), 'wb') as file:
-                pickle.dump(history.history, file)
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
-
-
-def plot_progress(history):
-    """
-    ***DEPRECATED - Tensorboard is a better implementation***
-    Uses history file of model to plot metrics
-    """
-    acc = history['accuracy']
-    val_acc = history['val_accuracy']
-
-    loss = history['loss']
-    val_loss = history['val_loss']
-
-    epochs_range = range(epochs)
-
-    plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-    plt.legend(loc='lower right')
-    plt.title('Training and Validation Accuracy')
-
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
-    plt.show()
 
 
 def calc_activations(model, index):

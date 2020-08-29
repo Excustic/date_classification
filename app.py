@@ -12,20 +12,24 @@ import datetime
 import glob
 import os
 import random
+import shutil
 import string
+import sys
 from os import listdir
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from flask import Flask, request, flash, render_template, Response, stream_with_context
 from os.path import join
 from werkzeug.utils import redirect, secure_filename
-from custom_CNN import save_path, home
 from fast_predict import create_lite, fast_predict
 
 app = Flask(__name__, static_url_path='/static')
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
+save_path = 'saved_files'
+home = sys.path[0]
 app.config['UPLOAD_IMAGES'] = join(home, 'static', 'images')
-app.config['UPLOAD_MODELS'] = join(home, 'saved_files', 'models')
+app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
+app.jinja_env.add_extension('jinja2.ext.do')
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
 model_name = 'CNN_model.h5'
 labels = {}
@@ -109,6 +113,10 @@ def stream_template(template_name, **context):
     return rv
 
 def single_score(files):
+    """
+    Generates a score for each file
+    :return generator object
+    """
     for file in files:
         filename = secure_filename(file.filename)
         filepath = join(app.config['UPLOAD_IMAGES'], filename.split('.')[0])
@@ -130,7 +138,7 @@ def single_score(files):
             filepath = final_path
             label = res_json["label"]
             confidence = res_json["confidence"]
-            obj = {'confidence': confidence, 'label': label, 'filepath': filepath, 'filename': filename}
+            obj = {'confidence': "{:.2%}".format(confidence), 'label': label, 'filepath': filepath, 'filename': filename}
             yield obj
         except Exception as e:
             print(e)
@@ -144,6 +152,8 @@ def score():
     global labels
     global confidences
     if request.method == 'POST':
+        shutil.rmtree(app.config['UPLOAD_IMAGES'])
+        os.mkdir(app.config['UPLOAD_IMAGES'])
         # check if the post request has the file part
         if 'file[]' not in request.files:
             flash('No file part')
@@ -156,6 +166,7 @@ def score():
             if not allowed_file(file.filename):
                 flash('Invalid file type')
                 return render_template('index.html')
+        flash('Selected ' + str(len(files)) + ' file(s)')
         return Response(stream_with_context(stream_template("index.html", gen=single_score(files))))
     filepaths = {}
     labels = {}

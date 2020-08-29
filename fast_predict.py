@@ -3,7 +3,7 @@ from time import time
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-from custom_CNN import fixed_size, train_labels
+from date_config import fixed_size, train_labels
 
 lite_model = None
 

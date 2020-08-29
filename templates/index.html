@@ -74,6 +74,27 @@
         height:15%;
         width:15%;
     }
+    #loading {
+        display: flex;
+        margin:auto;
+        margin-top: 20px;
+        margin-bottom: 20px;
+        visibility: visible;
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        -webkit-animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { -webkit-transform: rotate(360deg); }
+    }
+    @-webkit-keyframes spin {
+        to { -webkit-transform: rotate(360deg); }
+    }
     </style>
 </head>
 <body>
@@ -94,22 +115,55 @@
         <div class="button_upload" style="margin-top: 20px">
             <span>Upload</span> <input type="submit" class="hide_file">
         </div>
-        <div style="padding: 20px; font-family:Didact gothic; color:white"></div>
-        {% if gen %}
-            {% for obj in gen %}
-                <div style="display: flex;border: 2px solid white;width: 50%;margin: auto;">
-                    <img class="def" src="{{ url_for('static', filename='images/'+obj['filepath'].split('\\')[-1]) }}">
-                    <div style="margin-left: 10px;">
-                    <span class="title">{{ obj['filename'] }}</span>
-                    <br>
-                    <span class="normal">Label: {{ obj['label'] }}</span>
-                    <br>
-                    <span class="normal">Confidence: {{ obj['confidence'] }}</span>
-                    </div>
+    </form>
+    <div id="results">
+    {% if gen %}
+        <div id="loading"></div>
+        {% set obj_list = [] %}
+        {% for obj in gen %}
+            {% do obj_list.append(obj) %}
+            <div style="display: flex;border: 2px solid white;width: 50%;margin: auto;">
+                <img class="def" src="{{ url_for('static', filename='images/'+obj['filepath'].split('\\')[-1]) }}">
+                <div style="margin-left: 10px;">
+                <span class="title">{{ obj['filename'] }}</span>
+                <br>
+                <span class="normal">Label: {{ obj['label'] }}</span>
+                <br>
+                <span class="normal">Confidence: {{ obj['confidence'] }}</span>
                 </div>
-                <br clear="left">
+            </div>
+            <br clear="left">
+        {% endfor %}
+    {% endif %}
+    </div>
+    <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script type="text/javascript">
+        {% set dict_count = {} %}
+        {% if obj_list %}
+            var div_stats = '<div>'
+            div_stats += '<h1 style="border-bottom: 2px solid white; color:white; font-family: Didact Gothic; text-align: center; width:40%; margin:auto; margin-bottom:20px; margin-top:20px">Statistics</h1>';
+            div_stats += '<table style="width:40%; padding-bottom:10px; margin:auto; font-family: Didact Gothic; color:white; border-bottom: 2px solid white; margin-bottom: 20px;">';
+            div_stats += '<tbody><tr style="font-size: 25px"><th>Label Name</th><th>Amount</th><th>Percentage</th></tr>';
+            {% for obj in obj_list %}
+                {% if obj['label'] in dict_count %}
+                    {% set test = dict_count.update({obj['label']:dict_count[obj['label']]+1}) %}
+                {% else %}
+                    {% set test = dict_count.update({obj['label']:1}) %}
+                {% endif %}
             {% endfor %}
+            {% set list_label = [] %}
+            {% for obj in obj_list %}
+                {% if obj['label'] not in list_label %}
+                    div_stats += '<tr><th>{{ obj["label"] }}</th><th>{{ dict_count[obj["label"]] }}</th><th>{{ "%.2f"|format((dict_count[obj["label"]]/obj_list|length)*100) }}%</th></tr>';
+                {% endif %}
+                {% do list_label.append(obj["label"]) %}
+            {% endfor %}
+            div_stats += '</tbody></table></div>';
         {% endif %}
-	</form>
+        $(div_stats).prependTo("#results");
+        document.getElementById("loading").style.visibility = "hidden";
+        document.getElementById("loading").style.margintop = "hidden";
+        document.getElementById("loading").style.visibility = "hidden";
+    </script>
 </body>
 </html>
