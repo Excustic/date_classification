@@ -3,9 +3,8 @@ from time import time
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-from date_config import fixed_size, train_labels
+from importlib import import_module
 
-lite_model = None
 
 class LiteModel:
 
@@ -50,7 +49,7 @@ class LiteModel:
         return out[0].tolist()
 
 
-def fast_predict(filepath, filename):
+def fast_predict(lite_model, filepath, filename, task):
     """
     Imports a pre-trained model, feeds (filepath/filename) to the Lite neural network and predicts class with confidence
     This method is much faster than standard score, 50x factor!
@@ -58,6 +57,9 @@ def fast_predict(filepath, filename):
     # Start a stopper
     t0 = time()
     # Pillow library is used since we open a new file that wasn't in our test folder
+    config = import_module('configs.'+task+'_config')
+    fixed_size = config.fixed_size
+    train_labels = config.train_labels
     img = Image.open(join(filepath, filename))
     img = img.resize(fixed_size)
     img = np.array(img)
@@ -71,5 +73,4 @@ def fast_predict(filepath, filename):
 
 
 def create_lite(model):
-    global lite_model
-    lite_model = LiteModel.from_keras_model(model)
+    return LiteModel.from_keras_model(model)

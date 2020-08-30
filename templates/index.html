@@ -45,12 +45,11 @@
     width: 100%;
     }
     .button_upload{
+      display: flex;
       padding:10px 20px;
       background:#00ad2d;
-      margin-left: 43%;
-      margin-right:43%;
-      position:relative;
       color:#fff;
+      position:relative;
       border-radius:2px;
       text-align:center;
       float:center;
@@ -58,10 +57,9 @@
       font-family:sans-serif;
     }
     .button_choose{
+      display: flex;
       padding:10px 20px;
       background:#1aafff;
-      margin-left: 43%;
-      margin-right:43%;
       position:relative;
       color:#fff;
       border-radius:2px;
@@ -96,10 +94,10 @@
         to { -webkit-transform: rotate(360deg); }
     }
     </style>
-</head>
-<body>
     <meta charset="UTF-8">
     <title>Date Classification</title>
+</head>
+<body>
     <h1>Fruit Classification</h1>
      {% with messages = get_flashed_messages() %}
         {% if messages %}
@@ -109,12 +107,30 @@
         {% endif %}
     {% endwith %}
     <form id="myForm" method="post" enctype="multipart/form-data">
-        <div class="button_choose">
-            <span id="button-text">Choose Files</span> <input type="file" id="files" class="hide_file" name="file[]" multiple accept="image/*"><br/>
+         <div style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            align-self: center;
+            justify-content: center;
+            font-family: Didact Gothic;
+            color: white;">
+            <label for="tasks" >Select Task:</label>
+            <select id="tasks" name="task-type" style="font-family: Didact Gothic; margin-left: 10px; margin-right:10px; background-color: rgb(48,152,171,0.5); color: white;
+            border: 2px solid white;">
+                <option value="date">Date Classification</option>
+            </select>
+            <input type="checkbox" id="background_clear" name="clear_bg" value="True">
+            <label for="background_clear"> Clear background </label>
+            <div class="button_choose" style="margin-left: 20px;">
+                <span id="button-text">Choose Files</span> <input type="file" id="files" class="hide_file" name="file[]" multiple="" accept="image/*"><br>
+            </div>
+
+            <div class="button_upload" style="margin-left: 20px;">
+                <span>Upload</span> <input type="submit" class="hide_file">
+            </div>
         </div>
-        <div class="button_upload" style="margin-top: 20px">
-            <span>Upload</span> <input type="submit" class="hide_file">
-        </div>
+
     </form>
     <div id="results">
     {% if gen %}
@@ -164,11 +180,11 @@
                 {% do list_label.append(obj["label"]) %}
             {% endfor %}
             div_stats += '</tbody></table></div>';
-        {% endif %}
-        $(div_stats).prependTo("#results");
+             $(div_stats).prependTo("#results");
         document.getElementById("loading").style.visibility = "hidden";
         document.getElementById("loading").style.margintop = "hidden";
         document.getElementById("loading").style.visibility = "hidden";
+        {% endif %}
     </script>
 </body>
 </html>

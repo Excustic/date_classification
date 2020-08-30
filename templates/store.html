@@ -1,34 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link href='https://fonts.googleapis.com/css?family=Didact Gothic' rel='stylesheet'>
     <meta charset="UTF-8">
     <title>Date Classification</title>
-    <h1>Upload your model and weights (.h5 extensions only)</h1>
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            {% for msg in messages %}
-                <p>{{msg}}</p>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
  <style>
      div{
         padding: 10px;
      }
+     label{
+     font-family: 'Didact Gothic';
+     color: white;
+     }
+     h1 {text-align: center;
+    font-family:'Didact Gothic';
+    color: rgb(232, 232, 227)
+    }
+    span.normal {
+    font-family:'Didact Gothic';
+    font-size: 2vw;
+    color: rgb(232, 232, 227);
+    }
+    span.title{
+    font-family:'Didact Gothic';
+    font-size: 2vw;
+    color: yellow;
+    }
+    html{
+        height:100%;
+    }
+    body {
+        height: 100%;
+        background-image: repeating-linear-gradient(to right top, #3d4551, #436278, #3c839b, #28a6b7, #1cc9c9);
+        margin: 0;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+    .hide_file {
+    position: absolute;
+    z-index: 1000;
+    opacity: 0;
+    cursor: pointer;
+    right: 0;
+    top: 0;
+    height: 100%;
+    font-size: 24px;
+    width: 100%;
+    }
+    .button_choose{
+      display: flex;
+      padding:10px 20px;
+      background:#1aafff;
+      position:relative;
+      color:#fff;
+      border-radius:2px;
+      text-align:center;
+      float:center;
+      cursor:pointer;
+      font-family:sans-serif;
+    }
+    .button_upload{
+      display: flex;
+      padding:10px 20px;
+      background:#00ad2d;
+      color:#fff;
+      position:relative;
+      border-radius:2px;
+      text-align:center;
+      float:center;
+      cursor:pointer;
+      font-family:sans-serif;
+    }
  </style>
 </head>
 <body>
+    <h1>Upload your model and weights (.h5 extensions only)</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <p style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center">{{msg}}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
    <form method=post enctype=multipart/form-data>
-        <div>
-            <label for="model">Import Model</label>
-      <input type=file name=model id=model>
-        </div>
-        <div>
-            <label for="weights">Import Weights</label>
-      <input type=file name=weights id=weights>
-        </div>
-
-      <input type=submit value=Upload>
+       <div style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            align-self: center;
+            justify-content: center;
+            font-family: Didact Gothic;
+            color: white;">
+           <label for="tasks" >Select Task:</label>
+            <select id="tasks" name="task-type" style="font-family: Didact Gothic; margin-left: 10px; margin-right:10px; background-color: rgb(48,152,171,0.5); color: white;
+            border: 2px solid white;">
+                <option value="date">Date Classification</option>
+            </select>
+            <input type="checkbox" id="background_clear" name="clear_bg" value="True">
+            <label for="background_clear"> Clear background </label>
+            <div class="button_choose" style="margin-left: 20px">
+                <span>Import model</span>
+                <input type="file" name="model" id="model" class="hide_file">
+            </div>
+            <div class="button_choose" style="margin-left: 20px">
+                <span>Import Weights</span>
+                <input type="file" name="weights" id="weights" class="hide_file">
+            </div>
+            <div class="button_upload" style="margin-left: 20px">
+                <span>Upload</span> <input type="submit" class="hide_file">
+            </div>
+       </div>
     </form>
+    <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script type="text/javascript">
+        console.log('azi');
+         $('input#model').change(function(){
+            var fullPath = document.getElementById('model').value;
+            document.getElementById('model').textContent = fullPath;
+         });
+         $('input#weights').change(function(){
+            var fullPath = document.getElementById('weights').value;
+            document.getElementById('weights').textContent = fullPath;
+         });
+    </script>
 </body>
 </html>

@@ -17,19 +17,19 @@ import string
 import sys
 from os import listdir
 from pathlib import Path
-
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from flask import Flask, request, flash, render_template, Response, stream_with_context
-from os.path import join
+from os.path import join, isdir
 from werkzeug.utils import redirect, secure_filename
 from fast_predict import create_lite, fast_predict
+import threading
 
 app = Flask(__name__, static_url_path='/static')
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 save_path = 'saved_files'
-home = sys.path[0]
-app.config['UPLOAD_IMAGES'] = join(Path.cwd(), 'static', 'images')
+home = Path.cwd()
+app.config['UPLOAD_IMAGES'] = join(home, 'static', 'images')
 app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
 app.jinja_env.add_extension('jinja2.ext.do')
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
@@ -37,31 +37,31 @@ model_name = 'CNN_model.h5'
 labels = {}
 confidences = {}
 filepaths = {}
+models = {}
 res_generator = None
 
 
 def load_model_config():
     """
-    Loads newest model or the default
+    Load all models
     """
-    model = load_model(join(home, save_path, model_name))
-    model.load_weights(join(save_path, 'weights_best.hdf5'))
+    global models
     if os.path.isdir(app.config['UPLOAD_MODELS']):
-        latest_folder = max(glob.glob(join(app.config['UPLOAD_MODELS'], '*')), key=os.path.getctime)
-        try:
-            model = load_model(join(app.config['UPLOAD_MODELS'], latest_folder, 'model',
-                                    os.listdir(join(app.config['UPLOAD_MODELS'], latest_folder, 'model'))[0]))
-            model.load_weights(join(app.config['UPLOAD_MODELS'], latest_folder, 'weights',
-                                    listdir(join(app.config['UPLOAD_MODELS'], latest_folder, 'weights'))[0]))
-            return model
-        except Exception as e:
-            print(e)
-    return model
+        fruits = listdir(app.config['UPLOAD_MODELS'])
+        for f in fruits:
+            options = listdir(join(app.config['UPLOAD_MODELS'], f))
+            for o in options:
+                latest_folder = max(glob.glob(join(app.config['UPLOAD_MODELS'], f, o, '*/')), key=os.path.getctime)
+                model = load_model(join(latest_folder, 'model', listdir(join(latest_folder, 'model'))[0]))
+                model.load_weights(join(latest_folder, 'weights', listdir(join(latest_folder, 'weights'))[0]))
+                model = create_lite(model)
+                models[f+'_'+o] = model
+                print('loaded model at path', join(latest_folder, 'model', listdir(join(latest_folder, 'model'))[0]))
 
 
 def allowed_file(filename, mode=0):
     """
-    Validates the file type, only jpg and png are allowed
+    Validates the file type, only extensions from ALLOWED_EXTENSIONS
     """
     # mode 0 - picture upload, mode 1 - model and weights upload
     return '.' in filename and \
@@ -76,10 +76,12 @@ def store_model():
     """
     if request.method == 'POST':
         if 'model' not in request.files and 'weights' not in request.files:
-            flash('Missing files')
+            flash('No selected Files')
             return redirect(request.url)
         model = request.files['model']
         weights = request.files['weights']
+        bg_type = 'clear_bg' if request.form.get('clear_bg') else 'with_bg'
+        task_type = request.form.get('task-type')
         # submit an empty part without filename
         if model.filename == '' or weights.filename == '':
             flash('No selected file')
@@ -90,22 +92,40 @@ def store_model():
             return redirect(request.url)
         model_filename = secure_filename(model.filename)
         weights_filename = secure_filename(weights.filename)
-        filepath = join(app.config['UPLOAD_MODELS'], model_filename.split('.')[0]
-                        + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        filepath = join(app.config['UPLOAD_MODELS'], task_type, bg_type, model_filename.split('.')[0]
+                        + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         try:
-            if not os.path.isdir(app.config['UPLOAD_MODELS']):
+            if not isdir(app.config['UPLOAD_MODELS']):
                 os.mkdir(app.config['UPLOAD_MODELS'])
+            new_dir = join(app.config['UPLOAD_MODELS'], task_type)
+            if not isdir(new_dir):
+                os.mkdir(new_dir)
+            new_dir = join(new_dir, bg_type)
+            if not isdir(new_dir):
+                os.mkdir(new_dir)
             os.mkdir(filepath)
             os.mkdir(join(filepath, 'model'))
             os.mkdir(join(filepath, 'weights'))
             model.save(join(filepath, 'model', model_filename))
             weights.save(join(filepath, 'weights', weights_filename))
+            model_path = join(filepath, 'model', model_filename)
+            weights_path = join(filepath, 'weights', weights_filename)
+            threading.Thread(target=import_model, args=(model_path, weights_path, task_type, bg_type)).start()
         except Exception as e:
-            print(e)
-            return "Encountered Error"
-        return "Uploaded Successfully"
+                print(e)
+                return "Encountered Error"
+
+        flash("Uploaded Successfully")
+        return render_template("store.html")
     return render_template("store.html")
 
+def import_model(model_path, weights_path, task_type, bg_type):
+    global models
+    new_model = load_model(model_path)
+    new_model.load_weights(weights_path)
+    new_model = create_lite(new_model)
+    models[task_type + '_' + bg_type] = new_model
+    print("model ready")
 
 def stream_template(template_name, **context):
     app.update_template_context(context)
@@ -114,7 +134,7 @@ def stream_template(template_name, **context):
     rv.disable_buffering()
     return rv
 
-def single_score(files):
+def single_score(model, files, task):
     """
     Generates a score for each file
     :return generator object
@@ -135,7 +155,7 @@ def single_score(files):
             os.mkdir(filepath)
             file.save(join(filepath, filename))
             # fast_predict is a fast implementation of the basic predict method
-            res_json = fast_predict(filepath, filename)
+            res_json = fast_predict(model, filepath, filename, task)
             final_path = filepath.replace("\\","/").split('/')[-1] + '/' + filename
             filepath = final_path
             label = res_json["label"]
@@ -168,7 +188,19 @@ def score():
             if not allowed_file(file.filename):
                 flash('Invalid file type')
                 return render_template('index.html')
-        return Response(stream_with_context(stream_template("index.html", gen=single_score(files))))
+                # load specific model for the task
+        bg_type = 'clear_bg' if request.form.get('clear_bg') else 'with_bg'
+        task_type = request.form.get('task-type')
+        try:
+            model = models[task_type + '_' + bg_type]
+            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, task_type))))
+        except KeyError:
+            flash('This setting is not available')
+            render_template('index.html')
+        except Exception as e:
+            flash('Something went wrong')
+            print(e)
+            render_template('index.html')
     filepaths = {}
     labels = {}
     confidences = {}
@@ -176,11 +208,10 @@ def score():
 
 
 if __name__ == '__main__':
-    loaded_model = load_model_config()
-    create_lite(loaded_model)
+    load_model_config()
     # configurations for the usage gpu_tensorflow
     config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
     config.gpu_options.allow_growth = True
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -23,20 +23,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import tensorflow as tf
 from tensorflow.keras.applications import VGG16
-
-
-train_labels = ['PR_Class_Model', 'PR_Skin_Model', 'PR_Waste_Model']
-train_path = 'split2\\train'
-valid_path = 'split2\\val'
-test_path = 'split2\\test'
-save_path = 'saved_files'
-fixed_size = tuple((200, 200))
-home = sys.path[0]
-epochs = 100
-sessions = 1
-model_name = 'VGG16_model.h5'
-history_name = 'VGG16_history'
-batch_size = 32
+from configs.date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
 
 # configurations for the usage gpu_tensorflow
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
