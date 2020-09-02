@@ -9,8 +9,6 @@ __email__ = "michaelkushnir123233@gmail.com"
 __status__ = "prototype"
 
 import multiprocessing
-import pickle
-import sys
 import datetime
 from os.path import join
 import matplotlib.pyplot as plt

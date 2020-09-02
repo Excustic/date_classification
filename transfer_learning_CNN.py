@@ -23,9 +23,13 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import tensorflow as tf
 from tensorflow.keras.applications import VGG16
+
+from app import save_path, home
 from configs.date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
 
 # configurations for the usage gpu_tensorflow
+from custom_CNN import import_data
+
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
 config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
@@ -70,9 +74,9 @@ def train_model(train_generator, validation_generator):
         class_mode='sparse',
         batch_size=batch_size)
     model = build_model()
-    filepath = join(save_path, "weights_best_smart2.hdf5")
+    filepath = join(save_path, weights_path)
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=6, verbose=1, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=epochs // 5, verbose=1, restore_best_weights=True)
     log_dir = join(home, save_path, 'logs', 'fit_smart', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
@@ -107,3 +111,6 @@ def score(filepath, filename, model):
     print(p)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     return result
+
+train, val = import_data()
+train_model(train, val)

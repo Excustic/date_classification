@@ -118,10 +118,12 @@
             <label for="tasks" >Select Task:</label>
             <select id="tasks" name="task-type" style="font-family: Didact Gothic; margin-left: 10px; margin-right:10px; background-color: rgb(48,152,171,0.5); color: white;
             border: 2px solid white;">
-                <option value="date">Date Classification</option>
+                {% if model_names %}
+                    {% for name in model_names %}
+                        <option value="{{ name }}">{{ name }}</option>
+                    {% endfor %}
+                {% endif %}
             </select>
-            <input type="checkbox" id="background_clear" name="clear_bg" value="True">
-            <label for="background_clear"> Clear background </label>
             <div class="button_choose" style="margin-left: 20px;">
                 <span id="button-text">Choose Files</span> <input type="file" id="files" class="hide_file" name="file[]" multiple="" accept="image/*"><br>
             </div>
@@ -130,7 +132,9 @@
                 <span>Upload</span> <input type="submit" class="hide_file">
             </div>
         </div>
-
+        {% if labels %}
+            <p style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model's output labels : {{labels}} </p>
+        {% endif %}
     </form>
     <div id="results">
     {% if gen %}

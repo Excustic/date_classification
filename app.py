@@ -15,6 +15,7 @@ import random
 import shutil
 import string
 import sys
+from importlib import import_module
 from os import listdir
 from pathlib import Path
 import tensorflow as tf
@@ -34,9 +35,6 @@ app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
 app.jinja_env.add_extension('jinja2.ext.do')
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
 model_name = 'CNN_model.h5'
-labels = {}
-confidences = {}
-filepaths = {}
 models = {}
 res_generator = None
 
@@ -50,13 +48,21 @@ def load_model_config():
         fruits = listdir(app.config['UPLOAD_MODELS'])
         for f in fruits:
             options = listdir(join(app.config['UPLOAD_MODELS'], f))
+            model_name = None
+            weights = None
             for o in options:
-                latest_folder = max(glob.glob(join(app.config['UPLOAD_MODELS'], f, o, '*/')), key=os.path.getctime)
-                model = load_model(join(latest_folder, 'model', listdir(join(latest_folder, 'model'))[0]))
-                model.load_weights(join(latest_folder, 'weights', listdir(join(latest_folder, 'weights'))[0]))
-                model = create_lite(model)
-                models[f+'_'+o] = model
-                print('loaded model at path', join(latest_folder, 'model', listdir(join(latest_folder, 'model'))[0]))
+                path = join(app.config['UPLOAD_MODELS'], f, o)
+                if 'model.h5' in o.split('_'):
+                    model_name = path
+                elif 'weights.hdf5' in o.split('_'):
+                    weights = path
+            model = load_model(model_name)
+            model.load_weights(weights)
+            model = create_lite(model)
+            model_name = model_name.replace('\\', '/')
+            model_name = model_name.split('/')[-1]
+            models[model_name] = model
+            print('loaded model at path', model_name)
 
 
 def allowed_file(filename, mode=0):
@@ -80,8 +86,9 @@ def store_model():
             return redirect(request.url)
         model = request.files['model']
         weights = request.files['weights']
-        bg_type = 'clear_bg' if request.form.get('clear_bg') else 'with_bg'
+        bg_type = 'no_bg' if request.form.get('clear_bg') else 'with_bg'
         task_type = request.form.get('task-type')
+        name = task_type + '_' + bg_type
         # submit an empty part without filename
         if model.filename == '' or weights.filename == '':
             flash('No selected file')
@@ -92,25 +99,20 @@ def store_model():
             return redirect(request.url)
         model_filename = secure_filename(model.filename)
         weights_filename = secure_filename(weights.filename)
-        filepath = join(app.config['UPLOAD_MODELS'], task_type, bg_type, model_filename.split('.')[0]
-                        + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         try:
             if not isdir(app.config['UPLOAD_MODELS']):
                 os.mkdir(app.config['UPLOAD_MODELS'])
-            new_dir = join(app.config['UPLOAD_MODELS'], task_type)
+            new_dir = join(app.config['UPLOAD_MODELS'], name.split('_')[0])
             if not isdir(new_dir):
                 os.mkdir(new_dir)
-            new_dir = join(new_dir, bg_type)
-            if not isdir(new_dir):
-                os.mkdir(new_dir)
-            os.mkdir(filepath)
-            os.mkdir(join(filepath, 'model'))
-            os.mkdir(join(filepath, 'weights'))
-            model.save(join(filepath, 'model', model_filename))
-            weights.save(join(filepath, 'weights', weights_filename))
-            model_path = join(filepath, 'model', model_filename)
-            weights_path = join(filepath, 'weights', weights_filename)
-            threading.Thread(target=import_model, args=(model_path, weights_path, task_type, bg_type)).start()
+            for file in listdir(new_dir):
+                if name in file.replace('\\','/').split('/')[-1]:
+                    os.remove(file)
+            model_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'model.h5')
+            weights_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'weights.hdf5')
+            model.save(model_path)
+            weights.save(weights_path)
+            threading.Thread(target=import_model, args=(model_path, weights_path, model_path.replace("\\","/").split('/')[-1])).start()
         except Exception as e:
                 print(e)
                 return "Encountered Error"
@@ -119,12 +121,12 @@ def store_model():
         return render_template("store.html")
     return render_template("store.html")
 
-def import_model(model_path, weights_path, task_type, bg_type):
+def import_model(model_path, weights_path, name):
     global models
     new_model = load_model(model_path)
     new_model.load_weights(weights_path)
     new_model = create_lite(new_model)
-    models[task_type + '_' + bg_type] = new_model
+    models[name] = new_model
     print("model ready")
 
 def stream_template(template_name, **context):
@@ -155,7 +157,7 @@ def single_score(model, files, task):
             os.mkdir(filepath)
             file.save(join(filepath, filename))
             # fast_predict is a fast implementation of the basic predict method
-            res_json = fast_predict(model, filepath, filename, task)
+            res_json = fast_predict(model, filepath, filename, task.split('_')[0])
             final_path = filepath.replace("\\","/").split('/')[-1] + '/' + filename
             filepath = final_path
             label = res_json["label"]
@@ -170,9 +172,11 @@ def score():
     """
     REST function, receives an image and predicts its class
     """
-    global filepaths
-    global labels
-    global confidences
+    model_names = []
+    for folder in listdir(app.config['UPLOAD_MODELS']):
+        for file in listdir(join(app.config['UPLOAD_MODELS'], folder)):
+            if 'model.h5' in file.replace('\\', '/').split('_'):
+                model_names.append(file)
     if request.method == 'POST':
         shutil.rmtree(app.config['UPLOAD_IMAGES'])
         os.mkdir(app.config['UPLOAD_IMAGES'])
@@ -189,11 +193,11 @@ def score():
                 flash('Invalid file type')
                 return render_template('index.html')
                 # load specific model for the task
-        bg_type = 'clear_bg' if request.form.get('clear_bg') else 'with_bg'
-        task_type = request.form.get('task-type')
+        name = request.form.get('task-type')
+        labels = ' | '.join(import_module('configs.'+ name.split('_')[0] +'_config').train_labels)
         try:
-            model = models[task_type + '_' + bg_type]
-            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, task_type))))
+            model = models[name]
+            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, name), model_names=model_names, labels=labels)))
         except KeyError:
             flash('This setting is not available')
             render_template('index.html')
@@ -201,10 +205,7 @@ def score():
             flash('Something went wrong')
             print(e)
             render_template('index.html')
-    filepaths = {}
-    labels = {}
-    confidences = {}
-    return render_template("index.html")
+    return render_template("index.html", model_names=model_names)
 
 
 if __name__ == '__main__':
