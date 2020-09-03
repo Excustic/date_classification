@@ -59,10 +59,12 @@ def load_model_config():
             model = load_model(model_name)
             model.load_weights(weights)
             model = create_lite(model)
+            # To avoid os-based errors we will make sure backlashes are converted to forward slashes
             model_name = model_name.replace('\\', '/')
             model_name = model_name.split('/')[-1]
             models[model_name] = model
             print('loaded model at path', model_name)
+    else: os.mkdir(app.config['UPLOAD_MODELS'])
 
 
 def allowed_file(filename, mode=0):
@@ -97,8 +99,6 @@ def store_model():
                                                                                                     mode=1):
             flash('Invalid file')
             return redirect(request.url)
-        model_filename = secure_filename(model.filename)
-        weights_filename = secure_filename(weights.filename)
         try:
             if not isdir(app.config['UPLOAD_MODELS']):
                 os.mkdir(app.config['UPLOAD_MODELS'])
@@ -173,10 +173,13 @@ def score():
     REST function, receives an image and predicts its class
     """
     model_names = []
+    model_labels = {}
     for folder in listdir(app.config['UPLOAD_MODELS']):
         for file in listdir(join(app.config['UPLOAD_MODELS'], folder)):
             if 'model.h5' in file.replace('\\', '/').split('_'):
                 model_names.append(file)
+        model_labels[folder] = ' | '.join(import_module('configs.' + folder.replace("\\","/")
+                                                        .split('/')[-1].split('_')[0] + '_config').train_labels)
     if request.method == 'POST':
         shutil.rmtree(app.config['UPLOAD_IMAGES'])
         os.mkdir(app.config['UPLOAD_IMAGES'])
@@ -193,11 +196,10 @@ def score():
                 flash('Invalid file type')
                 return render_template('index.html')
                 # load specific model for the task
-        name = request.form.get('task-type')
-        labels = ' | '.join(import_module('configs.'+ name.split('_')[0] +'_config').train_labels)
         try:
+            name = request.form.get('task-type')
             model = models[name]
-            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, name), model_names=model_names, labels=labels)))
+            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, name), model_names=model_names, labels=model_labels)))
         except KeyError:
             flash('This setting is not available')
             render_template('index.html')
@@ -205,7 +207,7 @@ def score():
             flash('Something went wrong')
             print(e)
             render_template('index.html')
-    return render_template("index.html", model_names=model_names)
+    return render_template("index.html", model_names=model_names, labels=model_labels)
 
 
 if __name__ == '__main__':

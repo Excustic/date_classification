@@ -117,7 +117,7 @@
             color: white;">
             <label for="tasks" >Select Task:</label>
             <select id="tasks" name="task-type" style="font-family: Didact Gothic; margin-left: 10px; margin-right:10px; background-color: rgb(48,152,171,0.5); color: white;
-            border: 2px solid white;">
+            border: 2px solid white;" onchange="showLabels()">
                 {% if model_names %}
                     {% for name in model_names %}
                         <option value="{{ name }}">{{ name }}</option>
@@ -133,7 +133,15 @@
             </div>
         </div>
         {% if labels %}
-            <p style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model's output labels : {{labels}} </p>
+            <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+            <script>
+                var e = document.getElementById("tasks");
+                var key = e.options[e.selectedIndex].text.split('_')[0];
+                var labels = {{ labels|tojson }}
+                p_labels = '<p style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model output labels : ' + labels[key] + ' </p>';
+                $(p_labels).appendTo("#myForm");
+            </script>
+
         {% endif %}
     </form>
     <div id="results">
