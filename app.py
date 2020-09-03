@@ -107,7 +107,7 @@ def store_model():
                 os.mkdir(new_dir)
             for file in listdir(new_dir):
                 if name in file.replace('\\','/').split('/')[-1]:
-                    os.remove(file)
+                    os.remove(join(new_dir, file))
             model_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'model.h5')
             weights_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'weights.hdf5')
             model.save(model_path)
