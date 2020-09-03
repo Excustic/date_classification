@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <link href='https://fonts.googleapis.com/css?family=Didact Gothic' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
     h1 {text-align: center;
     font-family:'Didact Gothic';
@@ -137,7 +138,7 @@
             <script>
                 var e = document.getElementById("tasks");
                 var key = e.options[e.selectedIndex].text.split('_')[0];
-                var labels = {{ labels|tojson }}
+                var labels = {{ labels|tojson }};
                 p_labels = '<p style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model output labels : ' + labels[key] + ' </p>';
                 $(p_labels).appendTo("#myForm");
             </script>
@@ -171,6 +172,29 @@
         console.log(files.length);
         document.getElementById("button-text").textContent = "Selected " + files.length.toString() + " file(s)";
         });
+        function exportCSV(){
+            {% if obj_list %}
+                var rows = Array({{obj_list|length}}+1).fill(null).map(() => Array(3));
+                rows[0][0] = "Name";
+                rows[0][1] = "Label";
+                rows[0][2] = "Confidence";
+                let index = 1;
+                {% for obj in obj_list%}
+                    rows[index][0] = "{{ obj['filename']|string }}";
+                    rows[index][1] = "{{ obj['label']|string }}";
+                    rows[index][2] = "{{ obj['confidence']|string }}";
+                    index++;
+                {% endfor %}
+                let csvContent = "data:text/csv;charset=utf-8,"
+                + rows.map(e => e.join(",")).join("\n");
+                var encodedUri = encodeURI(csvContent);
+                var link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "results_"+Math.round(+new Date()/1000).toString()+".csv");
+                document.body.appendChild(link); // Required for FF
+                link.click();
+            {% endif %}
+        }
         {% set dict_count = {} %}
         {% if obj_list %}
             var div_stats = '<div>'
@@ -192,10 +216,12 @@
                 {% do list_label.append(obj["label"]) %}
             {% endfor %}
             div_stats += '</tbody></table></div>';
-             $(div_stats).prependTo("#results");
-        document.getElementById("loading").style.visibility = "hidden";
-        document.getElementById("loading").style.margintop = "hidden";
-        document.getElementById("loading").style.visibility = "hidden";
+            export_button = '<button id="csvexport" onclick="exportCSV();" style="background-color: rgb(255,255,255,0); text-align: center; font-family: Didact Gothic; margin: auto; color: white; display: flex; padding: 20px 10px; margin-bottom: 20px; border-radius: 25px; border: 2px solid white">Export results as CSV <i class="fa fa-download" style="font-size:24px; color: white"></i></button>'
+            $(export_button).prependTo("#results");
+            $(div_stats).prependTo("#results");
+            document.getElementById("loading").style.visibility = "hidden";
+            document.getElementById("loading").style.margintop = "hidden";
+            document.getElementById("loading").style.visibility = "hidden";
         {% endif %}
     </script>
 </body>
