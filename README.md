@@ -5,6 +5,9 @@ This is a documentation and tutorial for creating an Azure machine learning web 
 1. PR_Class_Model 
 2. PR_Skin_Model
 3. PR_Waste_Model
+
+![date classify](https://github.com/excustic/date_classification/blob/master/assets/demo.PNG?raw=true)
+
 ## Table of Contents
 * [Configuration](#config)
   * [Prerequisites](#prereq)
@@ -85,6 +88,10 @@ sf.ratio(in_path, out_path, seed=1337, ratio=(.7, .2, .1))
 This will basically take all of the subfolders from `in_path` and will split the data to a new folder that is located in `out_path` with the ratio of (train-70%, validation-20%, test-10%).
 ## <a name="train-main"></a>Training models
 This reopository includes two unique methods of training
+![cnn's filter visualization](https://github.com/excustic/date_classification/blob/master/assets/class_3.png?raw=true)
+This is what your CNN basically sees and identifies different patterns and qualities.
+![cnn's performance](https://github.com/excustic/date_classification/blob/master/assets/epoch_accuracy.svg?raw=true)
+This is how the CNN performs over time on training (blue) and validation (pink) data.
 ### <a name="train-custom"></a>Training a custom Convolutional Neural Network
 To build a custom CNN, you will be using `custom_CNN.py` module in the project.
 
