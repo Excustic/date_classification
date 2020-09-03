@@ -3,6 +3,7 @@
 <head>
     <link href='https://fonts.googleapis.com/css?family=Didact Gothic' rel='stylesheet'>
     <meta charset="UTF-8">
+    <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
     <title>Date Classification</title>
  <style>
      div{
@@ -13,6 +14,10 @@
      color: white;
      }
      h1 {text-align: center;
+    font-family:'Didact Gothic';
+    color: rgb(232, 232, 227)
+    }
+    .appStyle {text-align: center;
     font-family:'Didact Gothic';
     color: rgb(232, 232, 227)
     }
@@ -94,7 +99,11 @@
            <label for="tasks" >Select Task:</label>
             <select id="tasks" name="task-type" style="font-family: Didact Gothic; margin-left: 10px; margin-right:10px; background-color: rgb(48,152,171,0.5); color: white;
             border: 2px solid white;">
-                <option value="date">Date Classification</option>
+                {% if task_names %}
+                    {% for task in task_names %}
+                        <option value="{{task}}">{{ task }}</option>
+                    {% endfor %}
+                {% endif %}
             </select>
             <input type="checkbox" id="background_clear" name="clear_bg" value="True">
             <label for="background_clear"> Clear background </label>
@@ -106,14 +115,40 @@
                 <span>Import Weights</span>
                 <input type="file" name="weights" id="weights" class="hide_file">
             </div>
-            <div class="button_upload" style="margin-left: 20px">
-                <span>Upload</span> <input type="submit" class="hide_file">
+            <div class="button_choose" style="margin-left: 20px">
+                <span>Import config (only for new task)</span>
+                <input type="file" name="config" id="config" class="hide_file">
+            </div>
+           <div class="button_upload" style="margin-left: 20px">
+               <span>Upload</span> <input type="submit" class="hide_file">
             </div>
        </div>
     </form>
-    <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+     <div style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            align-self: center;
+            justify-content: center;
+            font-family: Didact Gothic;
+            color: white;">
+            <button id="new_task_prompt" class="button_choose" onclick="openInput();" style="border:0px"> Add a new task </button>
+           <script>
+            function openInput() {
+              var new_task = prompt("Enter your task name", "");
+              new_task = new_task.replace(/[^0-9a-z]/gi, '');
+              if (new_task != null) {
+              if($('#new_task').length == 0){
+                 $('#tasks').append($('<option>').val(new_task).text(new_task).attr('id','new_task'));
+                $('#tasks').val(new_task);
+                }
+                else $('#new_task').val(new_task).text(new_task);
+                }
+               document.getElementById('new_task_prompt').type = "hidden";
+            }
+            </script>
+     </div>
     <script type="text/javascript">
-        console.log('azi');
          $('input#model').change(function(){
             var fullPath = document.getElementById('model').value;
             document.getElementById('model').textContent = fullPath;

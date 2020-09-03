@@ -32,8 +32,9 @@ save_path = 'saved_files'
 home = Path.cwd()
 app.config['UPLOAD_IMAGES'] = join(home, 'static', 'images')
 app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
+app.config['UPLOAD_CONFIGS'] = join(home, 'configs')
 app.jinja_env.add_extension('jinja2.ext.do')
-ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'bmp', 'h5', 'hdf5']
+ALLOWED_EXTENSIONS = {'IMAGES': ['png', 'jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 'hdf5'], 'CONFIGS':['py']}
 model_name = 'CNN_model.h5'
 models = {}
 res_generator = None
@@ -67,14 +68,13 @@ def load_model_config():
     else: os.mkdir(app.config['UPLOAD_MODELS'])
 
 
-def allowed_file(filename, mode=0):
+def allowed_file(filename, mode):
     """
     Validates the file type, only extensions from ALLOWED_EXTENSIONS
     """
     # mode 0 - picture upload, mode 1 - model and weights upload
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS[(len(ALLOWED_EXTENSIONS) - 2)
-                                                                    * mode:(len(ALLOWED_EXTENSIONS) - 2) + mode * 2]
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS[mode]
 
 
 @app.route('/store', methods=['GET', 'POST'])
@@ -82,12 +82,16 @@ def store_model():
     """
     REST function, used for uploading an updated model
     """
+    task_names = []
+    for folder in listdir(app.config['UPLOAD_MODELS']):
+        task_names.append(folder)
     if request.method == 'POST':
         if 'model' not in request.files and 'weights' not in request.files:
             flash('No selected Files')
             return redirect(request.url)
         model = request.files['model']
         weights = request.files['weights']
+        config = request.files['config']
         bg_type = 'no_bg' if request.form.get('clear_bg') else 'with_bg'
         task_type = request.form.get('task-type')
         name = task_type + '_' + bg_type
@@ -95,8 +99,9 @@ def store_model():
         if model.filename == '' or weights.filename == '':
             flash('No selected file')
             return redirect(request.url)
-        if not model or not weights or not allowed_file(model.filename, mode=1) or not allowed_file(weights.filename,
-                                                                                                    mode=1):
+        if config and not allowed_file(config.filename, "CONFIGS") or \
+                not model or not weights or not allowed_file(model.filename, mode='MODELS') \
+                or not allowed_file(weights.filename, mode='MODELS'):
             flash('Invalid file')
             return redirect(request.url)
         try:
@@ -112,14 +117,15 @@ def store_model():
             weights_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'weights.hdf5')
             model.save(model_path)
             weights.save(weights_path)
+            config.save(join(app.config['UPLOAD_CONFIGS'], task_type + "_config.py"))
             threading.Thread(target=import_model, args=(model_path, weights_path, model_path.replace("\\","/").split('/')[-1])).start()
         except Exception as e:
                 print(e)
                 return "Encountered Error"
 
         flash("Uploaded Successfully")
-        return render_template("store.html")
-    return render_template("store.html")
+        return render_template("store.html", task_names=task_names)
+    return render_template("store.html", task_names=task_names)
 
 def import_model(model_path, weights_path, name):
     global models
@@ -192,7 +198,7 @@ def score():
             if not file or file.filename == '':
                 flash('No selected file')
                 return render_template('index.html')
-            if not allowed_file(file.filename):
+            if not allowed_file(file.filename, 'IMAGES'):
                 flash('Invalid file type')
                 return render_template('index.html')
                 # load specific model for the task

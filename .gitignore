@@ -3,6 +3,7 @@ origin2/
 static/images/*
 saved_files/
 split/
+Chess/
 split2/
 .idea/
 *.hdf5
