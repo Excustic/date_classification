@@ -24,7 +24,7 @@ import splitfolders as sf   # a good library for splitting dataset to train/val/
 from tensorflow.keras.optimizers import Adam
 from app import home, save_path
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from configs.date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
+from date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
 
 # configurations for the usage gpu_tensorflow
 config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
@@ -251,3 +251,6 @@ def score(filepath, filename, model):
     print(p)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     return result
+
+train, val = import_data()
+train_model(train, val)

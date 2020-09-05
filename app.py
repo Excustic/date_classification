@@ -46,27 +46,26 @@ def load_model_config():
     """
     global models
     if os.path.isdir(app.config['UPLOAD_MODELS']):
-        fruits = listdir(app.config['UPLOAD_MODELS'])
-        for f in fruits:
-            options = listdir(join(app.config['UPLOAD_MODELS'], f))
+        models_dir = app.config['UPLOAD_MODELS']
+        for m in listdir(models_dir):
             model_name = None
             weights = None
-            for o in options:
-                path = join(app.config['UPLOAD_MODELS'], f, o)
-                if 'model.h5' in o.split('_'):
-                    model_name = path
-                elif 'weights.hdf5' in o.split('_'):
-                    weights = path
-            model = load_model(model_name)
-            model.load_weights(weights)
-            model = create_lite(model)
-            # To avoid os-based errors we will make sure backlashes are converted to forward slashes
-            model_name = model_name.replace('\\', '/')
-            model_name = model_name.split('/')[-1]
-            models[model_name] = model
-            print('loaded model at path', model_name)
+            for type in listdir(join(models_dir, m)):
+                for file in listdir(join(models_dir, m, type)):
+                    path = join(models_dir, m, type, file)
+                    if 'model.h5' in file.split('_'):
+                        model_name = path
+                    elif 'weights.hdf5' in file.split('_'):
+                        weights = path
+                model = load_model(model_name)
+                model.load_weights(weights)
+                model = create_lite(model)
+                # To avoid os-based errors we will make sure backlashes are converted to forward slashes
+                model_name = model_name.replace('\\', '/')
+                model_name = model_name.split('/')[-1]
+                models[model_name] = model
+                print('loaded model at path', model_name)
     else: os.mkdir(app.config['UPLOAD_MODELS'])
-
 
 def allowed_file(filename, mode):
     """
@@ -110,9 +109,10 @@ def store_model():
             new_dir = join(app.config['UPLOAD_MODELS'], name.split('_')[0])
             if not isdir(new_dir):
                 os.mkdir(new_dir)
-            for file in listdir(new_dir):
-                if name in file.replace('\\','/').split('/')[-1]:
-                    os.remove(join(new_dir, file))
+            new_dir = join(new_dir, name)
+            if isdir(new_dir):
+                shutil.rmtree(new_dir)
+            os.mkdir(new_dir)
             model_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'model.h5')
             weights_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'weights.hdf5')
             model.save(model_path)
@@ -180,12 +180,14 @@ def score():
     """
     model_names = []
     model_labels = {}
-    for folder in listdir(app.config['UPLOAD_MODELS']):
-        for file in listdir(join(app.config['UPLOAD_MODELS'], folder)):
-            if 'model.h5' in file.replace('\\', '/').split('_'):
-                model_names.append(file)
-        model_labels[folder] = ' | '.join(import_module('configs.' + folder.replace("\\","/")
-                                                        .split('/')[-1].split('_')[0] + '_config').train_labels)
+    dir = app.config['UPLOAD_MODELS']
+    for model in listdir(dir):
+        for task in listdir(join(dir, model)):
+            for file in listdir(join(dir, model, task)):
+                if 'model.h5' in file.replace('\\', '/').split('_'):
+                    model_names.append(file)
+                    config_path = 'configs.' + model.replace("\\", "/").split('/')[-1].split('_')[0] + '_config'
+                    model_labels[file] = ' | '.join(import_module(config_path).train_labels)
     if request.method == 'POST':
         shutil.rmtree(app.config['UPLOAD_IMAGES'])
         os.mkdir(app.config['UPLOAD_IMAGES'])
@@ -197,10 +199,10 @@ def score():
         for file in files:
             if not file or file.filename == '':
                 flash('No selected file')
-                return render_template('index.html')
+                return render_template('index.html', model_names=model_names, labels=model_labels)
             if not allowed_file(file.filename, 'IMAGES'):
                 flash('Invalid file type')
-                return render_template('index.html')
+                return render_template('index.html', model_names=model_names, labels=model_labels)
                 # load specific model for the task
         try:
             name = request.form.get('task-type')
@@ -208,16 +210,16 @@ def score():
             return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, name), model_names=model_names, labels=model_labels)))
         except KeyError:
             flash('This setting is not available')
-            render_template('index.html')
+            render_template('index.html', model_names=model_names, labels=model_labels)
         except Exception as e:
             flash('Something went wrong')
             print(e)
-            render_template('index.html')
+            render_template('index.html', model_names=model_names, labels=model_labels)
     return render_template("index.html", model_names=model_names, labels=model_labels)
 
 
 if __name__ == '__main__':
-    load_model_config()
+    threading.Thread(target=load_model_config).start()
     # configurations for the usage gpu_tensorflow
     config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8))
     config.gpu_options.allow_growth = True

@@ -25,7 +25,7 @@ import tensorflow as tf
 from tensorflow.keras.applications import VGG16
 
 from app import save_path, home
-from configs.date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
+from date_config import batch_size, epochs, sessions, fixed_size, train_labels, train_path, test_path, valid_path, model_name, weights_path
 
 # configurations for the usage gpu_tensorflow
 from custom_CNN import import_data
@@ -81,6 +81,7 @@ def train_model(train_generator, validation_generator):
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     callbacks_list = [early_stopping, checkpoint, tensorboard_callback]
     # origin [sessions] models each [epochs] times
+    max_acc = 0.0
     for i in range(sessions):
         # model training and evaluation
         history = model.fit(
@@ -88,13 +89,16 @@ def train_model(train_generator, validation_generator):
             steps_per_epoch=train_generator.samples // batch_size,
             epochs=epochs,
             validation_data=validation_generator,
-            validation_steps=validation_generator.samples // batch_size,
-            verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
+            validation_steps=validation_generator.samples // batch_size
+            , verbose=2, callbacks=callbacks_list, workers=multiprocessing.cpu_count(),
             use_multiprocessing=False)
-        model.load_weights(join(filepath))
+        model.load_weights(join(save_path, weights_path))
         test_loss, test_acc = model.evaluate(test_generator, steps=len(test_generator))
+        # save model if it performed better
+        if test_acc > max_acc:
+            max_acc = test_acc
+            model.save(join(home, save_path, model_name))
         print("accuracy: ", test_acc, "\n Loss:", test_loss)
-        K.clear_session()
 
 
 def score(filepath, filename, model):
