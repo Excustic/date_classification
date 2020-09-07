@@ -49,4 +49,4 @@ COPY . /app
 # The code to run when container is started:
 COPY app.py .
 EXPOSE 5000
-ENTRYPOINT ["python", "app.py"]
+ENTRYPOINT ["python", "-u", "app.py"]

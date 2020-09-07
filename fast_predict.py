@@ -4,6 +4,8 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 from importlib import import_module
+import logging
+
 
 
 class LiteModel:
@@ -55,6 +57,7 @@ def fast_predict(lite_model, filepath, filename, task):
     This method is much faster than standard score, 50x factor!
     """
     # Start a stopper
+    from app import app
     t0 = time()
     # Pillow library is used since we open a new file that wasn't in our test folder
     config = import_module('configs.'+task+'_config')
@@ -68,7 +71,7 @@ def fast_predict(lite_model, filepath, filename, task):
     p = lite_model.predict_single(img)
     result = {'label': train_labels[p.index(max(p))], 'confidence': max(p)}
     # Print recorded time
-    print("%.4f sec" % (time() - t0))
+    app.logger.info("%.4f sec" % (time() - t0))
     return result
 
 

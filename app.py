@@ -15,6 +15,7 @@ import random
 import shutil
 import string
 import sys
+import logging
 from importlib import import_module
 from os import listdir
 from pathlib import Path
@@ -27,6 +28,7 @@ from fast_predict import create_lite, fast_predict
 import threading
 
 app = Flask(__name__, static_url_path='/static')
+app.logger.setLevel(logging.INFO)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 save_path = 'saved_files'
 home = Path.cwd()
@@ -38,13 +40,14 @@ ALLOWED_EXTENSIONS = {'IMAGES': ['png', 'jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 
 model_name = 'CNN_model.h5'
 models = {}
 res_generator = None
-
+# configure the handler and add it to the logger
 
 def load_model_config():
     """
     Load all models
     """
     global models
+    app.logger.info('preparing models')
     if os.path.isdir(app.config['UPLOAD_MODELS']):
         models_dir = app.config['UPLOAD_MODELS']
         for m in listdir(models_dir):
@@ -64,7 +67,7 @@ def load_model_config():
                 model_name = model_name.replace('\\', '/')
                 model_name = model_name.split('/')[-1]
                 models[model_name] = model
-                print('loaded model at path', model_name)
+                app.logger.info('loaded model at path: ' + model_name)
     else: os.mkdir(app.config['UPLOAD_MODELS'])
 
 def allowed_file(filename, mode):
@@ -115,12 +118,13 @@ def store_model():
             os.mkdir(new_dir)
             model_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'model.h5')
             weights_path = join(new_dir, name + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '_' + 'weights.hdf5')
+            app.logger.info("saving model at path: " + model_path)
             model.save(model_path)
             weights.save(weights_path)
             config.save(join(app.config['UPLOAD_CONFIGS'], task_type + "_config.py"))
             threading.Thread(target=import_model, args=(model_path, weights_path, model_path.replace("\\","/").split('/')[-1])).start()
         except Exception as e:
-                print(e)
+                app.logger.error(e)
                 return "Encountered Error"
 
         flash("Uploaded Successfully")
@@ -133,7 +137,7 @@ def import_model(model_path, weights_path, name):
     new_model.load_weights(weights_path)
     new_model = create_lite(new_model)
     models[name] = new_model
-    print("model ready")
+    app.logger.info(name + ": model ready")
 
 def stream_template(template_name, **context):
     app.update_template_context(context)
@@ -171,7 +175,7 @@ def single_score(model, files, task):
             obj = {'confidence': "{:.2%}".format(confidence), 'label': label, 'filepath': filepath, 'filename': filename}
             yield obj
         except Exception as e:
-            print(e)
+            app.logger.error(e)
             
 @app.route('/score', methods=['GET', 'POST'])
 def score():
@@ -213,7 +217,7 @@ def score():
             render_template('index.html', model_names=model_names, labels=model_labels)
         except Exception as e:
             flash('Something went wrong')
-            print(e)
+            app.logger.error(e)
             render_template('index.html', model_names=model_names, labels=model_labels)
     return render_template("index.html", model_names=model_names, labels=model_labels)
 
@@ -225,4 +229,5 @@ if __name__ == '__main__':
     config.gpu_options.allow_growth = True
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.logger.info("Starting app")
+    app.run(host='0.0.0.0', port=5000, debug=False)
