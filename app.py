@@ -9,12 +9,11 @@ __email__ = "michaelkushnir123233@gmail.com"
 __status__ = "prototype"
 
 import datetime
-import glob
+import json
 import os
 import random
 import shutil
 import string
-import sys
 import logging
 from importlib import import_module
 from os import listdir
@@ -32,13 +31,21 @@ app.logger.setLevel(logging.INFO)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 save_path = 'saved_files'
 home = Path.cwd()
+CONFIG_NAME = "config.json"
 app.config['UPLOAD_IMAGES'] = join(home, 'static', 'images')
 app.config['UPLOAD_MODELS'] = join(home, save_path, 'models')
-app.config['UPLOAD_CONFIGS'] = join(home, 'configs')
 app.jinja_env.add_extension('jinja2.ext.do')
-ALLOWED_EXTENSIONS = {'IMAGES': ['png', 'jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 'hdf5'], 'CONFIGS':['py']}
+CONTAINER_INSTANCE = 'CONTAINER_INSTANCE' in os.environ
+app.logger.info("CONTAINER_INSTANCE" + str(CONTAINER_INSTANCE))
+if CONTAINER_INSTANCE:
+    if not isdir('/home/saved_files'):
+        os.mkdir('/home/saved_files')
+    app.config['UPLOAD_MODELS'] = '/home/saved_files/models'
+ALLOWED_EXTENSIONS = {'IMAGES': ['png', 'jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 'hdf5'], 'CONFIGS':['json']}
 model_name = 'CNN_model.h5'
 models = {}
+model_names = []
+model_labels = {}
 res_generator = None
 # configure the handler and add it to the logger
 
@@ -47,6 +54,8 @@ def load_model_config():
     Load all models
     """
     global models
+    global model_names
+    global model_labels
     app.logger.info('preparing models')
     if os.path.isdir(app.config['UPLOAD_MODELS']):
         models_dir = app.config['UPLOAD_MODELS']
@@ -64,9 +73,12 @@ def load_model_config():
                 model.load_weights(weights)
                 model = create_lite(model)
                 # To avoid os-based errors we will make sure backlashes are converted to forward slashes
-                model_name = model_name.replace('\\', '/')
-                model_name = model_name.split('/')[-1]
+                model_name = model_name.replace('\\', '/').split('/')[-1]
                 models[model_name] = model
+                model_names.append(model_name)
+                with open(join(models_dir, m, type, CONFIG_NAME)) as data:
+                    config_file = json.load(data)
+                    model_labels[model_name] = ' | '.join((config_file)['train_labels'])
                 app.logger.info('loaded model at path: ' + model_name)
     else: os.mkdir(app.config['UPLOAD_MODELS'])
 
@@ -84,6 +96,8 @@ def store_model():
     """
     REST function, used for uploading an updated model
     """
+    global model_names
+    global model_labels
     task_names = []
     for folder in listdir(app.config['UPLOAD_MODELS']):
         task_names.append(folder)
@@ -111,6 +125,9 @@ def store_model():
                 os.mkdir(app.config['UPLOAD_MODELS'])
             new_dir = join(app.config['UPLOAD_MODELS'], name.split('_')[0])
             if not isdir(new_dir):
+                if not config:
+                    flash('config file required')
+                    return redirect(request.url)
                 os.mkdir(new_dir)
             new_dir = join(new_dir, name)
             if isdir(new_dir):
@@ -121,8 +138,14 @@ def store_model():
             app.logger.info("saving model at path: " + model_path)
             model.save(model_path)
             weights.save(weights_path)
-            config.save(join(app.config['UPLOAD_CONFIGS'], task_type + "_config.py"))
-            threading.Thread(target=import_model, args=(model_path, weights_path, model_path.replace("\\","/").split('/')[-1])).start()
+            model_name = model_path.replace("\\", "/").split('/')[-1]
+            model_names.append(model_name)
+            if config:
+                config.save(join(new_dir, CONFIG_NAME))
+                with open(join(new_dir, CONFIG_NAME)) as data:
+                    config_file = json.load(data)
+                    model_labels[model_name] = ' | '.join((config_file)['train_labels'])
+            threading.Thread(target=import_model, args=(model_path, weights_path, model_name)).start()
         except Exception as e:
                 app.logger.error(e)
                 return "Encountered Error"
@@ -146,7 +169,7 @@ def stream_template(template_name, **context):
     rv.disable_buffering()
     return rv
 
-def single_score(model, files, task):
+def single_score(model, files, train_labels):
     """
     Generates a score for each file
     :return generator object
@@ -167,7 +190,7 @@ def single_score(model, files, task):
             os.mkdir(filepath)
             file.save(join(filepath, filename))
             # fast_predict is a fast implementation of the basic predict method
-            res_json = fast_predict(model, filepath, filename, task.split('_')[0])
+            res_json = fast_predict(model, filepath, filename, train_labels)
             final_path = filepath.replace("\\","/").split('/')[-1] + '/' + filename
             filepath = final_path
             label = res_json["label"]
@@ -182,16 +205,8 @@ def score():
     """
     REST function, receives an image and predicts its class
     """
-    model_names = []
-    model_labels = {}
-    dir = app.config['UPLOAD_MODELS']
-    for model in listdir(dir):
-        for task in listdir(join(dir, model)):
-            for file in listdir(join(dir, model, task)):
-                if 'model.h5' in file.replace('\\', '/').split('_'):
-                    model_names.append(file)
-                    config_path = 'configs.' + model.replace("\\", "/").split('/')[-1].split('_')[0] + '_config'
-                    model_labels[file] = ' | '.join(import_module(config_path).train_labels)
+    global model_names
+    global model_labels
     if request.method == 'POST':
         shutil.rmtree(app.config['UPLOAD_IMAGES'])
         os.mkdir(app.config['UPLOAD_IMAGES'])
@@ -211,14 +226,14 @@ def score():
         try:
             name = request.form.get('task-type')
             model = models[name]
-            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, name), model_names=model_names, labels=model_labels)))
+            return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, model_labels[name].split('|')), model_names=model_names, labels=model_labels)))
         except KeyError:
             flash('This setting is not available')
-            render_template('index.html', model_names=model_names, labels=model_labels)
+            return render_template('index.html', model_names=model_names, labels=model_labels)
         except Exception as e:
             flash('Something went wrong')
             app.logger.error(e)
-            render_template('index.html', model_names=model_names, labels=model_labels)
+            return render_template('index.html', model_names=model_names, labels=model_labels)
     return render_template("index.html", model_names=model_names, labels=model_labels)
 
 

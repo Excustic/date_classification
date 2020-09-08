@@ -43,6 +43,7 @@ RUN /opt/conda/bin/conda install --yes --freeze-installed \
         nomkl \
     && /opt/conda/bin/conda clean -afy
 ENV PATH=/opt/conda/bin:${PATH}
+ENV CONTAINER_INSTANCE=True
 WORKDIR /app
 # # Copy the current directory contents into the container at /app
 COPY . /app

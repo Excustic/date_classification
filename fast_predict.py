@@ -4,8 +4,6 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 from importlib import import_module
-import logging
-
 
 
 class LiteModel:
@@ -51,7 +49,7 @@ class LiteModel:
         return out[0].tolist()
 
 
-def fast_predict(lite_model, filepath, filename, task):
+def fast_predict(lite_model, filepath, filename, train_labels):
     """
     Imports a pre-trained model, feeds (filepath/filename) to the Lite neural network and predicts class with confidence
     This method is much faster than standard score, 50x factor!
@@ -60,9 +58,8 @@ def fast_predict(lite_model, filepath, filename, task):
     from app import app
     t0 = time()
     # Pillow library is used since we open a new file that wasn't in our test folder
-    config = import_module('configs.'+task+'_config')
-    fixed_size = config.fixed_size
-    train_labels = config.train_labels
+    from app import model_labels
+    fixed_size = tuple(lite_model.input_shape[1:3])
     img = Image.open(join(filepath, filename))
     img = img.resize(fixed_size)
     img = np.array(img)

@@ -138,11 +138,11 @@
             <script src='https://cdn.polyfill.io/v2/polyfill.js?features?feature=Array.prototype.findIndex'></script>
             <script>
             var labels = {{ labels|tojson }};
-            local_key = localStorage.getItem("currentLabel");
+            local_key = sessionStorage.getItem("currentLabel");
             if($('#labels').length == 0)
             {
                 var e = document.getElementById("tasks");
-                var key = (local_key != null) ? local_key : e.options[e.selectedIndex].value;
+                var key = e.options[e.selectedIndex].value;
                 p_labels = '<p id="labels" style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model output labels : ' + labels[key] + ' </p>';
             }
             else document.getElementById('labels').textContent = "Model output labels : " + labels[local_key];
@@ -151,7 +151,7 @@
                 var e = document.getElementById("tasks");
                 var key = e.options[e.selectedIndex].value;
                 document.getElementById('labels').textContent = "Model output labels : " + labels[key];
-                localStorage.setItem("currentLabel", key);
+                sessionStorage.setItem("currentLabel", key);
             }
             </script>
 
