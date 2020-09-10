@@ -232,6 +232,7 @@ def score():
             return render_template('index.html', model_names=model_names, labels=model_labels)
         except Exception as e:
             flash('Something went wrong')
+            print('hgelo')
             app.logger.error(e)
             return render_template('index.html', model_names=model_names, labels=model_labels)
     return render_template("index.html", model_names=model_names, labels=model_labels)
