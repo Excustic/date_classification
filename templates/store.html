@@ -79,7 +79,7 @@
  </style>
 </head>
 <body>
-    <h1>Upload your model and weights (.h5 extensions only)</h1>
+    <h1>Upload your model and weights</h1>
     {% with messages = get_flashed_messages() %}
         {% if messages %}
             {% for msg in messages %}
@@ -109,15 +109,15 @@
             <label for="background_clear"> Clear background </label>
             <div class="button_choose" style="margin-left: 20px">
                 <span>Import model</span>
-                <input type="file" name="model" id="model" class="hide_file">
+                <input type="file" name="model" id="model" class="hide_file" accept=".h5">
             </div>
             <div class="button_choose" style="margin-left: 20px">
-                <span>Import Weights</span>
-                <input type="file" name="weights" id="weights" class="hide_file">
+                <span>Import weights</span>
+                <input type="file" name="weights" id="weights" class="hide_file" accept=".hdf5">
             </div>
             <div class="button_choose" style="margin-left: 20px">
-                <span>Import config (only for new task)</span>
-                <input type="file" name="config" id="config" class="hide_file">
+                <span>Import config</span>
+                <input type="file" name="config" id="config" class="hide_file" accept=".json">
             </div>
            <div class="button_upload" style="margin-left: 20px">
                <span>Upload</span> <input type="submit" class="hide_file">

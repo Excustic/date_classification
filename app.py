@@ -41,7 +41,7 @@ if CONTAINER_INSTANCE:
     if not isdir('/home/saved_files'):
         os.mkdir('/home/saved_files')
     app.config['UPLOAD_MODELS'] = '/home/saved_files/models'
-ALLOWED_EXTENSIONS = {'IMAGES': ['png', 'jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 'hdf5'], 'CONFIGS':['json']}
+ALLOWED_EXTENSIONS = {'IMAGES': ['jpg', 'jpeg', 'bmp'], 'MODELS': ['h5', 'hdf5'], 'CONFIGS':['json']}
 model_name = 'CNN_model.h5'
 models = {}
 model_names = []
@@ -118,7 +118,7 @@ def store_model():
         if config and not allowed_file(config.filename, "CONFIGS") or \
                 not model or not weights or not allowed_file(model.filename, mode='MODELS') \
                 or not allowed_file(weights.filename, mode='MODELS'):
-            flash('Invalid file')
+            flash('Insufficient files or unsupported file types')
             return redirect(request.url)
         try:
             if not isdir(app.config['UPLOAD_MODELS']):
@@ -220,7 +220,7 @@ def score():
                 flash('No selected file')
                 return render_template('index.html', model_names=model_names, labels=model_labels)
             if not allowed_file(file.filename, 'IMAGES'):
-                flash('Invalid file type')
+                flash('File type not supported')
                 return render_template('index.html', model_names=model_names, labels=model_labels)
                 # load specific model for the task
         try:
@@ -228,7 +228,7 @@ def score():
             model = models[name]
             return Response(stream_with_context(stream_template("index.html", gen=single_score(model, files, model_labels[name].split('|')), model_names=model_names, labels=model_labels)))
         except KeyError:
-            flash('This setting is not available')
+            flash('Model unavailable currently')
             return render_template('index.html', model_names=model_names, labels=model_labels)
         except Exception as e:
             flash('Something went wrong')
@@ -245,4 +245,4 @@ if __name__ == '__main__':
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
     app.logger.info("Starting app")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

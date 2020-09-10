@@ -3,6 +3,12 @@
 <head>
     <link href='https://fonts.googleapis.com/css?family=Didact Gothic' rel='stylesheet'>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script
+      src="https://code.jquery.com/jquery-3.5.1.min.js"
+      integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+      crossorigin="anonymous"></script>
+    <script src="./static/jquery.cookie.js"></script>
+    <script src='https://cdn.polyfill.io/v2/polyfill.js?features?feature=Array.prototype.findIndex'></script>
     <style>
     h1 {text-align: center;
     font-family:'Didact Gothic';
@@ -10,7 +16,7 @@
     }
     span.normal {
     font-family:'Didact Gothic';
-    font-size: 2vw;
+    font-size: 2rem;
     color: rgb(232, 232, 227);
     }
     span.title{
@@ -70,8 +76,7 @@
       font-family:sans-serif;
     }
     img.def{
-        height:15%;
-        width:15%;
+        height:200px;
     }
     #loading {
         display: flex;
@@ -134,15 +139,17 @@
             </div>
         </div>
         {% if labels %}
-            <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
-            <script src='https://cdn.polyfill.io/v2/polyfill.js?features?feature=Array.prototype.findIndex'></script>
             <script>
             var labels = {{ labels|tojson }};
-            local_key = sessionStorage.getItem("currentLabel");
+            local_key = $.cookie('currentLabel');
             if($('#labels').length == 0)
             {
                 var e = document.getElementById("tasks");
                 var key = e.options[e.selectedIndex].value;
+                if(local_key !== 'undefined')
+                    key = local_key;
+                    arr = Array.apply(null, e.options);
+                    e.selectedIndex = arr.findIndex(elem => elem.value == key);
                 p_labels = '<p id="labels" style="font-family: Didact Gothic; color: rgb(232, 232, 227); text-align: center; font-size: 24px"> Model output labels : ' + labels[key] + ' </p>';
             }
             else document.getElementById('labels').textContent = "Model output labels : " + labels[local_key];
@@ -151,7 +158,7 @@
                 var e = document.getElementById("tasks");
                 var key = e.options[e.selectedIndex].value;
                 document.getElementById('labels').textContent = "Model output labels : " + labels[key];
-                sessionStorage.setItem("currentLabel", key);
+                $.cookie("currentLabel", key);
             }
             </script>
 
@@ -163,7 +170,7 @@
         {% set obj_list = [] %}
         {% for obj in gen %}
             {% do obj_list.append(obj) %}
-            <div style="display: flex;border: 2px solid white;width: 50%;margin: auto;">
+            <div style="display: flex;border: 2px solid white;width: 50%;margin: auto; max-height: 200px">
                 <img class="def" src="{{ url_for('static', filename='images/'+obj['filepath']) }}">
                 <div style="margin-left: 10px;">
                 <span class="title">{{ obj['filename'] }}</span>
@@ -177,7 +184,6 @@
         {% endfor %}
     {% endif %}
     </div>
-    <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
     <script type="text/javascript">
         $('input#files').change(function(){
         var files = $(this)[0].files;
@@ -228,13 +234,13 @@
                 {% do list_label.append(obj["label"]) %}
             {% endfor %}
             div_stats += '</tbody></table></div>';
-            export_button = '<button id="csvexport" onclick="exportCSV();" style="background-color: rgb(255,255,255,0); text-align: center; font-family: Didact Gothic; margin: auto; color: white; display: flex; padding: 20px 10px; margin-bottom: 20px; border-radius: 25px; border: 2px solid white">Export results as CSV <i class="fa fa-download" style="font-size:24px; color: white"></i></button>'
+            export_button = '<button id="csvexport" onclick="exportCSV();" style="background-color: rgb(255,255,255,0); text-align: center; font-size: 24px; font-family: Didact Gothic; margin: auto; color: white; display: flex; padding: 20px 10px; margin-bottom: 20px; border-radius: 25px; border: 2px solid white">Export results as CSV <i class="fa fa-download" style="font-size:24px; color: white; margin-left:5px; margin-top: auto"></i></button>'
             $(export_button).prependTo("#results");
             $(div_stats).prependTo("#results");
-            document.getElementById("loading").style.visibility = "hidden";
-            document.getElementById("loading").style.margintop = "hidden";
-            document.getElementById("loading").style.visibility = "hidden";
+            document.getElementById("loading").remove();
         {% endif %}
     </script>
+    <!-- at the end of the BODY -->
+
 </body>
 </html>
