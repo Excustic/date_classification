@@ -245,4 +245,4 @@ if __name__ == '__main__':
     session = tf.compat.v1.Session(config=config)
     tf.compat.v1.keras.backend.set_session(session)
     app.logger.info("Starting app")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
